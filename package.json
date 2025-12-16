@@ -1,7 +1,7 @@
 {
   "name": "pedidos-faturamento",
   "version": "1.0.0",
-  "description": "Sistema de Pedidos de Faturamento com integração Supabase",
+  "description": "Sistema de Pedidos de Faturamento com integração Supabase e autenticação",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,7 +11,8 @@
     "pedidos",
     "faturamento",
     "supabase",
-    "estoque"
+    "estoque",
+    "autenticacao"
   ],
   "author": "I.R. Comércio",
   "license": "MIT",
