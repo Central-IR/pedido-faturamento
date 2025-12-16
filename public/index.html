@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedidos de Faturamento</title>
+    <link rel="icon" type="image/png" href="I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Pedidos de Faturamento</h1>
+            <div id="connectionStatus" class="connection-status offline">
+                <span class="status-dot"></span>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total de Pedidos</div>
+                <div class="stat-value" id="totalPedidos">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pedidos Emitidos</div>
+                <div class="stat-value stat-success" id="totalEmitidos">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pedidos Pendentes</div>
+                <div class="stat-value stat-pending" id="totalPendentes">0</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="filter-section">
+                <div class="form-group">
+                    <label for="search">Pesquisar</label>
+                    <input type="text" id="search" placeholder="Código, CNPJ, razão social..." oninput="filterPedidos()">
+                </div>
+                <div class="form-group">
+                    <label for="filterVendedor">Vendedor</label>
+                    <select id="filterVendedor" onchange="filterPedidos()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterStatus">Status</label>
+                    <select id="filterStatus" onchange="filterPedidos()">
+                        <option value="">Todos</option>
+                        <option value="pendente">Pendente</option>
+                        <option value="emitida">Emitida</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">✓</th>
+                            <th>Código</th>
+                            <th>Razão Social</th>
+                            <th>CNPJ</th>
+                            <th>Vendedor</th>
+                            <th>Valor Total</th>
+                            <th>Status</th>
+                            <th style="text-align: center;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pedidosContainer"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <button class="fab-button" onclick="openFormModal()" title="Novo Pedido"></button>
+
+    <div class="modal-overlay" id="infoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Pedido Nº <span id="modalCodigo"></span></h3>
+                <button class="close-modal" onclick="closeInfoModal()">✕</button>
+            </div>
+            <div id="infoContent"></div>
+            <div class="modal-actions">
+                <button onclick="closeInfoModal()" class="secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
