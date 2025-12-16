@@ -18,37 +18,45 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
     process.exit(1);
 }
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const PORTAL_URL = process.env.PORTAL_URL || 'https://ir-comercio-portal-zcan.onrender.com';
 
-// ============================================
-// MIDDLEWARE DE AUTENTICAÇÃO
-// ============================================
-function verificarAutenticacao(req, res, next) {
+async function verificarAutenticacao(req, res, next) {
+    const publicPaths = ['/', '/health'];
+    if (publicPaths.includes(req.path)) return next();
+
     const sessionToken = req.headers['x-session-token'];
-    
     if (!sessionToken) {
-        return res.status(401).json({ error: 'Não autorizado - Token ausente' });
+        console.log('❌ Token não fornecido');
+        return res.status(401).json({ error: 'Não autenticado' });
     }
-    
-    // Verificar se o token é válido
-    if (VALID_SESSIONS.has(sessionToken)) {
-        const session = VALID_SESSIONS.get(sessionToken);
-        if (session.expires > Date.now()) {
-            // Renovar expiração
-            session.expires = Date.now() + (24 * 60 * 60 * 1000); // +24h
-            next();
-            return;
-        } else {
-            VALID_SESSIONS.delete(sessionToken);
-        }
-    }
-    
-    return res.status(401).json({ error: 'Sessão expirada ou inválida' });
-}
 
+    try {
+        const verifyResponse = await fetch(`${PORTAL_URL}/api/verify-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
+
+        if (!verifyResponse.ok) {
+            console.log('❌ Sessão inválida - Status:', verifyResponse.status);
+            return res.status(401).json({ error: 'Sessão inválida' });
+        }
+
+        const sessionData = await verifyResponse.json();
+        if (!sessionData.valid) {
+            console.log('❌ Sessão não válida');
+            return res.status(401).json({ error: 'Sessão inválida' });
+        }
+
+        req.user = sessionData.session;
+        req.sessionToken = sessionToken;
+        console.log('✅ Autenticação OK');
+        next();
+    } catch (error) {
+        console.error('❌ Erro ao verificar autenticação:', error.message);
+        return res.status(500).json({ error: 'Erro ao verificar autenticação', details: error.message });
+    }
+}
 // ============================================
 // ROTAS PÚBLICAS
 // ============================================
