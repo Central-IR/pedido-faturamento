@@ -1,6 +1,10 @@
-// CONFIGURAÇÃO DO SUPABASE
-const SUPABASE_URL = 'https://qcwzdfmqzcmlxygbzfsw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjd3pkZm1xemNtbHh5Z2J6ZnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM0OTI3NzYsImV4cCI6MjA0OTA2ODc3Nn0.rPmz-Zke4nKJkxNQtmfF7SvKBXTk_H0e_QOhD-MmPVQ';
+// ============================================
+// CONFIGURAÇÃO - SEM CREDENCIAIS!
+// ============================================
+const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3004/api'
+    : `${window.location.origin}/api`;
 
 let pedidos = [];
 let isOnline = false;
@@ -8,14 +12,74 @@ let itemCounter = 0;
 let clientesCache = {};
 let estoqueCache = {};
 let editingId = null;
+let sessionToken = null;
 
 // Função auxiliar para converter texto para maiúsculas
 function toUpperCase(value) {
     return value ? String(value).toUpperCase() : '';
 }
 
-// INICIALIZAÇÃO
-async function init() {
+// ============================================
+// INICIALIZAÇÃO E AUTENTICAÇÃO
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    verificarAutenticacao();
+});
+
+function verificarAutenticacao() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('sessionToken');
+
+    if (tokenFromUrl) {
+        sessionToken = tokenFromUrl;
+        sessionStorage.setItem('pedidosSession', tokenFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        sessionToken = sessionStorage.getItem('pedidosSession');
+    }
+
+    if (!sessionToken) {
+        mostrarTelaAcessoNegado();
+        return;
+    }
+
+    inicializarApp();
+}
+
+function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
+    document.body.innerHTML = `
+        <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            text-align: center;
+            padding: 2rem;
+        ">
+            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">
+                ${mensagem}
+            </h1>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                Somente usuários autenticados podem acessar esta área.
+            </p>
+            <a href="${PORTAL_URL}" style="
+                display: inline-block;
+                background: var(--btn-register);
+                color: white;
+                padding: 14px 32px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: 600;
+                text-transform: uppercase;
+            ">IR PARA O PORTAL</a>
+        </div>
+    `;
+}
+
+async function inicializarApp() {
     await checkConnection();
     await loadPedidos();
     await loadEstoque();
@@ -28,34 +92,73 @@ async function init() {
     }, 10000);
 }
 
-// CONEXÃO
+// ============================================
+// CONEXÃO COM A API
+// ============================================
 async function checkConnection() {
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-            headers: { 'apikey': SUPABASE_KEY }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(`${API_URL}/pedidos`, {
+            method: 'HEAD',
+            headers: { 'X-Session-Token': sessionToken },
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return false;
+        }
+
+        const wasOffline = !isOnline;
         isOnline = response.ok;
-    } catch {
+        
+        if (wasOffline && isOnline) {
+            console.log('✅ Servidor ONLINE');
+            await loadPedidos();
+        } else if (!wasOffline && !isOnline) {
+            console.log('❌ Servidor OFFLINE');
+        }
+        
+        updateConnectionStatus();
+        return isOnline;
+    } catch (error) {
+        if (isOnline) {
+            console.log('❌ Erro de conexão:', error.message);
+        }
         isOnline = false;
+        updateConnectionStatus();
+        return false;
     }
-    updateConnectionStatus();
 }
 
 function updateConnectionStatus() {
     const status = document.getElementById('connectionStatus');
-    status.className = isOnline ? 'connection-status online' : 'connection-status offline';
+    if (status) {
+        status.className = isOnline ? 'connection-status online' : 'connection-status offline';
+    }
 }
 
+// ============================================
 // CARREGAR PEDIDOS
+// ============================================
 async function loadPedidos() {
     if (!isOnline) return;
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=*&order=codigo.desc`, {
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+        const response = await fetch(`${API_URL}/pedidos`, {
+            headers: { 'X-Session-Token': sessionToken }
         });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
+
         if (response.ok) {
             pedidos = await response.json();
             atualizarCacheClientes(pedidos);
@@ -66,15 +169,21 @@ async function loadPedidos() {
     }
 }
 
+// ============================================
 // CARREGAR ESTOQUE
+// ============================================
 async function loadEstoque() {
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/estoque?select=*`, {
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+        const response = await fetch(`${API_URL}/estoque`, {
+            headers: { 'X-Session-Token': sessionToken }
         });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
+
         if (response.ok) {
             const items = await response.json();
             estoqueCache = {};
@@ -88,7 +197,9 @@ async function loadEstoque() {
     }
 }
 
+// ============================================
 // CACHE DE CLIENTES
+// ============================================
 function atualizarCacheClientes(pedidos) {
     clientesCache = {};
     pedidos.forEach(pedido => {
@@ -117,7 +228,9 @@ function atualizarCacheClientes(pedidos) {
     console.log(`👥 ${Object.keys(clientesCache).length} clientes em cache`);
 }
 
+// ============================================
 // ATUALIZAR DISPLAY
+// ============================================
 function updateDisplay() {
     const totalEmitidos = pedidos.filter(p => p.status === 'emitida').length;
     const totalPendentes = pedidos.filter(p => p.status === 'pendente').length;
@@ -130,7 +243,9 @@ function updateDisplay() {
     updateTable();
 }
 
+// ============================================
 // ATUALIZAR FILTRO DE VENDEDORES
+// ============================================
 function updateVendedoresFilter() {
     const vendedores = new Set();
     pedidos.forEach(p => {
@@ -153,7 +268,9 @@ function updateVendedoresFilter() {
     }
 }
 
+// ============================================
 // ATUALIZAR TABELA
+// ============================================
 function updateTable() {
     const container = document.getElementById('pedidosContainer');
     let filtered = [...pedidos];
@@ -221,7 +338,9 @@ function clearFilters() {
     updateDisplay();
 }
 
+// ============================================
 // ABRIR FORMULÁRIO MODAL
+// ============================================
 function openFormModal() {
     editingId = null;
     itemCounter = 0;
@@ -479,7 +598,6 @@ function buscarDadosEstoque(input) {
         calculateItemTotal(row.querySelector('.item-qtd'));
         showToast('DADOS DO ESTOQUE CARREGADOS!', 'success');
         
-        // Limpar sugestões
         const container = row.querySelector('.suggestions-container');
         if (container) container.innerHTML = '';
     }
@@ -559,7 +677,9 @@ function formatCurrency(value) {
     return `R$ ${parseFloat(value).toFixed(2).replace('.', ',')}`;
 }
 
+// ============================================
 // SUBMIT DO FORMULÁRIO
+// ============================================
 async function handleSubmit(event) {
     event.preventDefault();
     
@@ -608,20 +728,24 @@ async function handleSubmit(event) {
     try {
         const isEditing = editingId !== null;
         const url = isEditing 
-            ? `${SUPABASE_URL}/rest/v1/pedidos_faturamento?id=eq.${editingId}`
-            : `${SUPABASE_URL}/rest/v1/pedidos_faturamento`;
+            ? `${API_URL}/pedidos/${editingId}`
+            : `${API_URL}/pedidos`;
         const method = isEditing ? 'PATCH' : 'POST';
         
         const response = await fetch(url, {
             method,
             headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
+                'X-Session-Token': sessionToken,
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(formData)
         });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
         
         if (!response.ok) throw new Error('ERRO AO SALVAR');
         
@@ -633,7 +757,9 @@ async function handleSubmit(event) {
     }
 }
 
+// ============================================
 // TOGGLE STATUS (EMITIR/REABRIR)
+// ============================================
 async function toggleStatus(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
@@ -641,7 +767,6 @@ async function toggleStatus(id) {
     const novoStatus = pedido.status === 'pendente' ? 'emitida' : 'pendente';
     
     if (novoStatus === 'emitida') {
-        // Verificar estoque
         const verificacao = await verificarEstoque(pedido);
         if (!verificacao.sucesso) {
             showToast(verificacao.mensagem, 'error');
@@ -649,16 +774,13 @@ async function toggleStatus(id) {
             return;
         }
         
-        // Confirmar emissão
         if (!confirm(`CONFIRMAR EMISSÃO DO PEDIDO ${pedido.codigo}?\n\nO estoque será atualizado automaticamente.`)) {
             document.getElementById(`check-${id}`).checked = false;
             return;
         }
         
-        // Atualizar estoque
         await atualizarEstoque(pedido);
     } else {
-        // Confirmar reabertura
         if (!confirm(`REABRIR O PEDIDO ${pedido.codigo}?\n\nATENÇÃO: O estoque NÃO será revertido automaticamente!`)) {
             document.getElementById(`check-${id}`).checked = true;
             return;
@@ -671,15 +793,20 @@ async function toggleStatus(id) {
             data_emissao: novoStatus === 'emitida' ? new Date().toISOString() : null
         };
         
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/pedidos_faturamento?id=eq.${id}`, {
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
             method: 'PATCH',
             headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'X-Session-Token': sessionToken,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(updates)
         });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
         
         if (!response.ok) throw new Error('ERRO AO ATUALIZAR');
         
@@ -691,7 +818,9 @@ async function toggleStatus(id) {
     }
 }
 
+// ============================================
 // VERIFICAR ESTOQUE
+// ============================================
 async function verificarEstoque(pedido) {
     for (const item of pedido.items) {
         if (!item.codigoEstoque) continue;
@@ -716,7 +845,9 @@ async function verificarEstoque(pedido) {
     return { sucesso: true };
 }
 
+// ============================================
 // ATUALIZAR ESTOQUE
+// ============================================
 async function atualizarEstoque(pedido) {
     for (const item of pedido.items) {
         if (!item.codigoEstoque) continue;
@@ -725,11 +856,10 @@ async function atualizarEstoque(pedido) {
         const estoqueItem = estoqueCache[codigoUpper];
         const novaQuantidade = estoqueItem.quantidade - item.quantidade;
         
-        await fetch(`${SUPABASE_URL}/rest/v1/estoque?codigo=eq.${estoqueItem.codigo}`, {
+        await fetch(`${API_URL}/estoque/${estoqueItem.codigo}`, {
             method: 'PATCH',
             headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'X-Session-Token': sessionToken,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ quantidade: novaQuantidade })
@@ -738,7 +868,9 @@ async function atualizarEstoque(pedido) {
     await loadEstoque();
 }
 
+// ============================================
 // VISUALIZAR PEDIDO
+// ============================================
 function viewPedido(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
@@ -804,7 +936,9 @@ function closeInfoModal() {
     document.getElementById('infoModal').classList.remove('show');
 }
 
+// ============================================
 // EDITAR PEDIDO
+// ============================================
 async function editPedido(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) {
@@ -958,7 +1092,6 @@ async function editPedido(id) {
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
-    // Preencher itens
     if (pedido.items && pedido.items.length > 0) {
         pedido.items.forEach(item => {
             addItem();
@@ -990,13 +1123,16 @@ async function deletePedido(id) {
     if (!confirm('TEM CERTEZA QUE DESEJA EXCLUIR ESTE PEDIDO?')) return;
     
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/pedidos_faturamento?id=eq.${id}`, {
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
             method: 'DELETE',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+            headers: { 'X-Session-Token': sessionToken }
         });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
         
         if (!response.ok) throw new Error('ERRO AO EXCLUIR');
         
@@ -1032,6 +1168,3 @@ document.addEventListener('click', function(e) {
         });
     }
 });
-
-// INICIALIZAR
-init();
