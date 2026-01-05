@@ -19,6 +19,11 @@ function toUpperCase(value) {
     return value ? String(value).toUpperCase() : '';
 }
 
+// Função para capitalizar apenas primeira letra
+function capitalizeText(text) {
+    return text.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
 // ============================================
 // INICIALIZAÇÃO E AUTENTICAÇÃO
 // ============================================
@@ -46,7 +51,7 @@ function verificarAutenticacao() {
     inicializarApp();
 }
 
-function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
+function mostrarTelaAcessoNegado(mensagem = 'Não Autorizado') {
     document.body.innerHTML = `
         <div style="
             display: flex;
@@ -74,7 +79,7 @@ function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
                 text-decoration: none;
                 font-weight: 600;
                 text-transform: uppercase;
-            ">IR PARA O PORTAL</a>
+            ">Ir Para o Portal</a>
         </div>
     `;
 }
@@ -110,7 +115,7 @@ async function checkConnection() {
 
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            mostrarTelaAcessoNegado('Sua Sessão Expirou');
             return false;
         }
 
@@ -155,7 +160,7 @@ async function loadPedidos() {
 
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            mostrarTelaAcessoNegado('Sua Sessão Expirou');
             return;
         }
 
@@ -180,7 +185,7 @@ async function loadEstoque() {
 
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            mostrarTelaAcessoNegado('Sua Sessão Expirou');
             return;
         }
 
@@ -257,11 +262,11 @@ function updateVendedoresFilter() {
     const select = document.getElementById('filterVendedor');
     if (select) {
         const currentValue = select.value;
-        select.innerHTML = '<option value="">TODOS</option>';
+        select.innerHTML = '<option value="">Todos</option>';
         Array.from(vendedores).sort().forEach(v => {
             const option = document.createElement('option');
             option.value = v;
-            option.textContent = v;
+            option.textContent = capitalizeText(v);
             select.appendChild(option);
         });
         select.value = currentValue;
@@ -296,7 +301,7 @@ function updateTable() {
     }
     
     if (filtered.length === 0) {
-        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">NENHUM PEDIDO ENCONTRADO</td></tr>';
+        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum Pedido Encontrado</td></tr>';
         return;
     }
     
@@ -310,17 +315,17 @@ function updateTable() {
                 </div>
             </td>
             <td><strong>${pedido.codigo}</strong></td>
-            <td>${toUpperCase(pedido.razao_social)}</td>
+            <td>${capitalizeText(pedido.razao_social)}</td>
             <td>${pedido.cnpj}</td>
-            <td>${toUpperCase(pedido.vendedor || '-')}</td>
+            <td>${capitalizeText(pedido.vendedor || '-')}</td>
             <td><strong>${pedido.valor_total}</strong></td>
-            <td><span class="badge ${pedido.status}">${pedido.status === 'emitida' ? 'EMITIDA' : 'PENDENTE'}</span></td>
+            <td><span class="badge ${pedido.status}">${pedido.status === 'emitida' ? 'Emitida' : 'Pendente'}</span></td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: var(--btn-view);">VER</button>
-                    <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: var(--btn-edit);">EDITAR</button>
-                    <button onclick="emitirPedido(${pedido.id})" class="action-btn emit">EMITIR</button>
-                    <button onclick="deletePedido(${pedido.id})" class="action-btn danger">EXCLUIR</button>
+                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: var(--btn-view);">Ver</button>
+                    <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: var(--btn-edit);">Editar</button>
+                    <button onclick="emitirPedido(${pedido.id})" class="action-btn emit">Emitir</button>
+                    <button onclick="deletePedido(${pedido.id})" class="action-btn danger">Excluir</button>
                 </div>
             </td>
         </tr>
@@ -350,15 +355,15 @@ function openFormModal() {
         <div class="modal-overlay" id="formModal" style="display: flex;">
             <div class="modal-content" style="max-width: 1400px;">
                 <div class="modal-header">
-                    <h3 class="modal-title">NOVO PEDIDO DE FATURAMENTO</h3>
+                    <h3 class="modal-title">Novo Pedido de Faturamento</h3>
                     <button class="close-modal" onclick="closeFormModal()">✕</button>
                 </div>
                 
                 <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchTab('tab-faturamento')">FATURAMENTO</button>
-                    <button class="tab-btn" onclick="switchTab('tab-pedido')">PEDIDO</button>
-                    <button class="tab-btn" onclick="switchTab('tab-mercadoria')">MERCADORIA</button>
-                    <button class="tab-btn" onclick="switchTab('tab-entrega')">ENTREGA</button>
+                    <button class="tab-btn active" onclick="switchTab('tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn" onclick="switchTab('tab-pedido')">Pedido</button>
+                    <button class="tab-btn" onclick="switchTab('tab-mercadoria')">Mercadoria</button>
+                    <button class="tab-btn" onclick="switchTab('tab-entrega')">Entrega</button>
                 </div>
 
                 <form id="pedidoForm" onsubmit="handleSubmit(event)">
@@ -368,58 +373,58 @@ function openFormModal() {
                     <div class="tab-content active" id="tab-faturamento">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>CÓDIGO DO PEDIDO</label>
-                                <input type="text" value="${nextCodigo}" readonly>
+                                <label>Código do Pedido</label>
+                                <input type="text" value="${nextCodigo}" readonly class="input-editable">
                             </div>
                             <div class="form-group">
                                 <label for="cnpj">CNPJ *</label>
                                 <input type="text" id="cnpj" required onblur="buscarDadosCliente()">
                             </div>
                             <div class="form-group">
-                                <label for="razaoSocial">RAZÃO SOCIAL *</label>
+                                <label for="razaoSocial">Razão Social *</label>
                                 <input type="text" id="razaoSocial" required>
                             </div>
                             <div class="form-group">
-                                <label for="inscricaoEstadual">INSCRIÇÃO ESTADUAL</label>
+                                <label for="inscricaoEstadual">Inscrição Estadual</label>
                                 <input type="text" id="inscricaoEstadual">
                             </div>
                             <div class="form-group">
-                                <label for="endereco">ENDEREÇO</label>
+                                <label for="endereco">Endereço</label>
                                 <input type="text" id="endereco">
                             </div>
                             <div class="form-group">
-                                <label for="telefone">TELEFONE</label>
+                                <label for="telefone">Telefone</label>
                                 <input type="text" id="telefone">
                             </div>
                             <div class="form-group">
-                                <label for="contato">CONTATO</label>
+                                <label for="contato">Contato</label>
                                 <input type="text" id="contato">
                             </div>
                             <div class="form-group">
-                                <label for="email">E-MAIL</label>
+                                <label for="email">E-mail</label>
                                 <input type="email" id="email" style="text-transform: lowercase !important;">
                             </div>
                             <div class="form-group">
-                                <label for="documento">DOCUMENTO</label>
+                                <label for="documento">Documento</label>
                                 <input type="text" id="documento">
                             </div>
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-pedido">
-                        <button type="button" onclick="addItem()" class="success small" style="margin-bottom: 1rem;">+ ADICIONAR ITEM</button>
+                        <button type="button" onclick="addItem()" class="success small" style="margin-bottom: 1rem;">+ Adicionar Item</button>
                         <div style="overflow-x: auto;">
                             <table class="items-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40px;">ITEM</th>
-                                        <th style="width: 120px;">CÓD. ESTOQUE</th>
-                                        <th style="min-width: 200px;">ESPECIFICAÇÃO</th>
-                                        <th style="width: 80px;">QTD</th>
-                                        <th style="width: 80px;">UNID</th>
+                                        <th style="width: 40px;">Item</th>
+                                        <th style="width: 120px;">Cód. Estoque</th>
+                                        <th style="min-width: 200px;">Especificação</th>
+                                        <th style="width: 80px;">Qtd</th>
+                                        <th style="width: 80px;">Unid</th>
                                         <th style="width: 100px;">NCM</th>
-                                        <th style="width: 100px;">VALOR UN</th>
-                                        <th style="width: 120px;">TOTAL</th>
+                                        <th style="width: 100px;">Valor Un</th>
+                                        <th style="width: 120px;">Total</th>
                                         <th style="width: 80px;"></th>
                                     </tr>
                                 </thead>
@@ -427,23 +432,23 @@ function openFormModal() {
                             </table>
                         </div>
                         <div class="form-group" style="margin-top: 1rem;">
-                            <label>VALOR TOTAL DO PEDIDO</label>
-                            <input type="text" id="valorTotalPedido" readonly value="R$ 0,00">
+                            <label>Valor Total do Pedido</label>
+                            <input type="text" id="valorTotalPedido" readonly value="R$ 0,00" class="input-editable">
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-mercadoria">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="peso">PESO (KG)</label>
+                                <label for="peso">Peso (Kg)</label>
                                 <input type="number" id="peso" step="0.01" min="0">
                             </div>
                             <div class="form-group">
-                                <label for="quantidade">QUANTIDADE TOTAL</label>
+                                <label for="quantidade">Quantidade Total</label>
                                 <input type="number" id="quantidade" min="0">
                             </div>
                             <div class="form-group">
-                                <label for="volumes">VOLUME(S)</label>
+                                <label for="volumes">Volume(s)</label>
                                 <input type="number" id="volumes" min="0">
                             </div>
                         </div>
@@ -452,35 +457,35 @@ function openFormModal() {
                     <div class="tab-content" id="tab-entrega">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="localEntrega">LOCAL DE ENTREGA</label>
+                                <label for="localEntrega">Local de Entrega</label>
                                 <input type="text" id="localEntrega">
                             </div>
                             <div class="form-group">
-                                <label for="setor">SETOR</label>
+                                <label for="setor">Setor</label>
                                 <input type="text" id="setor">
                             </div>
                             <div class="form-group">
-                                <label for="previsaoEntrega">PREVISÃO DE ENTREGA</label>
+                                <label for="previsaoEntrega">Previsão de Entrega</label>
                                 <input type="date" id="previsaoEntrega">
                             </div>
                             <div class="form-group">
-                                <label for="transportadora">TRANSPORTADORA</label>
+                                <label for="transportadora">Transportadora</label>
                                 <input type="text" id="transportadora">
                             </div>
                             <div class="form-group">
-                                <label for="valorFrete">VALOR DO FRETE</label>
+                                <label for="valorFrete">Valor do Frete</label>
                                 <input type="text" id="valorFrete">
                             </div>
                             <div class="form-group">
-                                <label for="vendedor">VENDEDOR</label>
+                                <label for="vendedor">Vendedor</label>
                                 <input type="text" id="vendedor">
                             </div>
                         </div>
                     </div>
 
                     <div class="modal-actions">
-                        <button type="submit" style="background: var(--btn-save);">SALVAR PEDIDO</button>
-                        <button type="button" onclick="closeFormModal()" class="secondary">CANCELAR</button>
+                        <button type="submit" style="background: var(--btn-save);">Salvar Pedido</button>
+                        <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
                     </div>
                 </form>
             </div>
@@ -532,7 +537,7 @@ function buscarDadosCliente() {
         if (cliente.volumes) document.getElementById('volumes').value = cliente.volumes;
         if (cliente.previsaoEntrega) document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
         
-        showToast('DADOS DO CLIENTE CARREGADOS!', 'success');
+        showToast('Dados do cliente carregados!', 'success');
     }
 }
 
@@ -596,7 +601,7 @@ function buscarDadosEstoque(input) {
         row.querySelector('.item-ncm').value = item.ncm || '';
         row.querySelector('.item-valor').value = item.preco_venda || 0;
         calculateItemTotal(row.querySelector('.item-qtd'));
-        showToast('DADOS DO ESTOQUE CARREGADOS!', 'success');
+        showToast('Dados do estoque carregados!', 'success');
         
         const container = row.querySelector('.suggestions-container');
         if (container) container.innerHTML = '';
@@ -743,17 +748,17 @@ async function handleSubmit(event) {
 
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            mostrarTelaAcessoNegado('Sua Sessão Expirou');
             return;
         }
         
-        if (!response.ok) throw new Error('ERRO AO SALVAR');
+        if (!response.ok) throw new Error('Erro ao salvar');
         
-        showToast(isEditing ? 'PEDIDO ATUALIZADO COM SUCESSO!' : 'PEDIDO CRIADO COM SUCESSO!', 'success');
+        showToast(isEditing ? 'Pedido atualizado com sucesso!' : 'Pedido criado com sucesso!', 'success');
         closeFormModal();
         await loadPedidos();
     } catch (error) {
-        showToast('ERRO AO SALVAR PEDIDO: ' + error.message, 'error');
+        showToast('Erro ao salvar pedido: ' + error.message, 'error');
     }
 }
 
@@ -774,17 +779,19 @@ async function toggleStatus(id) {
             return;
         }
         
-        if (!confirm(`CONFIRMAR EMISSÃO DO PEDIDO ${pedido.codigo}?\n\nO estoque será atualizado automaticamente.`)) {
+        if (!confirm(`Confirmar emissão do pedido ${pedido.codigo}?\n\nO estoque será atualizado automaticamente.`)) {
             document.getElementById(`check-${id}`).checked = false;
             return;
         }
         
-        await atualizarEstoque(pedido);
+        await atualizarEstoque(pedido, 'descontar');
     } else {
-        if (!confirm(`REABRIR O PEDIDO ${pedido.codigo}?\n\nATENÇÃO: O estoque NÃO será revertido automaticamente!`)) {
+        if (!confirm(`Reabrir o pedido ${pedido.codigo}?\n\nO estoque será revertido automaticamente.`)) {
             document.getElementById(`check-${id}`).checked = true;
             return;
         }
+        
+        await atualizarEstoque(pedido, 'reverter');
     }
     
     try {
@@ -804,16 +811,16 @@ async function toggleStatus(id) {
 
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            mostrarTelaAcessoNegado('Sua Sessão Expirou');
             return;
         }
         
-        if (!response.ok) throw new Error('ERRO AO ATUALIZAR');
+        if (!response.ok) throw new Error('Erro ao atualizar');
         
-        showToast(`PEDIDO ${novoStatus === 'emitida' ? 'EMITIDO' : 'REABERTO'}!`, 'success');
+        showToast(`Pedido ${novoStatus === 'emitida' ? 'emitido' : 'reaberto'}!`, 'success');
         await loadPedidos();
     } catch (error) {
-        showToast('ERRO AO ATUALIZAR STATUS', 'error');
+        showToast('Erro ao atualizar status', 'error');
         document.getElementById(`check-${id}`).checked = pedido.status === 'emitida';
     }
 }
@@ -831,14 +838,14 @@ async function verificarEstoque(pedido) {
         if (!estoqueItem) {
             return {
                 sucesso: false,
-                mensagem: `ITEM ${item.codigoEstoque} NÃO ENCONTRADO NO ESTOQUE`
+                mensagem: `Item ${item.codigoEstoque} não encontrado no estoque`
             };
         }
         
         if (estoqueItem.quantidade < item.quantidade) {
             return {
                 sucesso: false,
-                mensagem: `ESTOQUE INSUFICIENTE PARA ${item.codigoEstoque}.\nDISPONÍVEL: ${estoqueItem.quantidade}\nNECESSÁRIO: ${item.quantidade}`
+                mensagem: `Estoque insuficiente para ${item.codigoEstoque}.\nDisponível: ${estoqueItem.quantidade}\nNecessário: ${item.quantidade}`
             };
         }
     }
@@ -848,13 +855,16 @@ async function verificarEstoque(pedido) {
 // ============================================
 // ATUALIZAR ESTOQUE
 // ============================================
-async function atualizarEstoque(pedido) {
+async function atualizarEstoque(pedido, operacao) {
     for (const item of pedido.items) {
         if (!item.codigoEstoque) continue;
         
         const codigoUpper = toUpperCase(item.codigoEstoque);
         const estoqueItem = estoqueCache[codigoUpper];
-        const novaQuantidade = estoqueItem.quantidade - item.quantidade;
+        
+        const novaQuantidade = operacao === 'descontar' 
+            ? estoqueItem.quantidade - item.quantidade 
+            : estoqueItem.quantidade + item.quantidade;
         
         await fetch(`${API_URL}/estoque/${estoqueItem.codigo}`, {
             method: 'PATCH',
@@ -875,65 +885,183 @@ function viewPedido(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
     
-    document.getElementById('modalCodigo').textContent = pedido.codigo;
-    
-    const content = `
-        <h4 style="color: var(--primary); margin-bottom: 0.75rem; margin-top: 1.5rem;">DADOS DE FATURAMENTO</h4>
-        <p><strong>CNPJ:</strong> ${pedido.cnpj}</p>
-        <p><strong>RAZÃO SOCIAL:</strong> ${toUpperCase(pedido.razao_social)}</p>
-        ${pedido.inscricao_estadual ? `<p><strong>INSCRIÇÃO ESTADUAL:</strong> ${toUpperCase(pedido.inscricao_estadual)}</p>` : ''}
-        ${pedido.endereco ? `<p><strong>ENDEREÇO:</strong> ${toUpperCase(pedido.endereco)}</p>` : ''}
-        ${pedido.telefone ? `<p><strong>TELEFONE:</strong> ${toUpperCase(pedido.telefone)}</p>` : ''}
-        ${pedido.email ? `<p><strong>E-MAIL:</strong> ${pedido.email}</p>` : ''}
-        
-        <h4 style="color: var(--primary); margin-bottom: 0.75rem; margin-top: 1.5rem;">ITENS DO PEDIDO</h4>
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; margin-top: 0.5rem;">
-                <thead>
-                    <tr>
-                        <th>ITEM</th>
-                        <th>CÓDIGO</th>
-                        <th>ESPECIFICAÇÃO</th>
-                        <th>QTD</th>
-                        <th>VALOR UN</th>
-                        <th>TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${pedido.items.map(item => `
-                        <tr>
-                            <td>${item.item}</td>
-                            <td>${toUpperCase(item.codigoEstoque || '-')}</td>
-                            <td>${toUpperCase(item.especificacao)}</td>
-                            <td>${item.quantidade}</td>
-                            <td>R$ ${item.valorUnitario.toFixed(2)}</td>
-                            <td>${item.valorTotal}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+    const modalHTML = `
+        <div class="modal-overlay show" id="infoModal">
+            <div class="modal-content" style="max-width: 1200px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">Visualizar Pedido #${pedido.codigo}</h3>
+                    <button class="close-modal" onclick="closeInfoModal()">✕</button>
+                </div>
+                
+                <div class="tabs-nav">
+                    <button class="tab-btn active" onclick="switchViewTab('view-faturamento')">Faturamento</button>
+                    <button class="tab-btn" onclick="switchViewTab('view-pedido')">Pedido</button>
+                    <button class="tab-btn" onclick="switchViewTab('view-mercadoria')">Mercadoria</button>
+                    <button class="tab-btn" onclick="switchViewTab('view-entrega')">Entrega</button>
+                </div>
+
+                <div class="tab-content active" id="view-faturamento">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <strong>CNPJ:</strong>
+                            <p>${pedido.cnpj}</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>Razão Social:</strong>
+                            <p>${capitalizeText(pedido.razao_social)}</p>
+                        </div>
+                        ${pedido.inscricao_estadual ? `
+                        <div class="info-item">
+                            <strong>Inscrição Estadual:</strong>
+                            <p>${capitalizeText(pedido.inscricao_estadual)}</p>
+                        </div>` : ''}
+                        ${pedido.endereco ? `
+                        <div class="info-item">
+                            <strong>Endereço:</strong>
+                            <p>${capitalizeText(pedido.endereco)}</p>
+                        </div>` : ''}
+                        ${pedido.telefone ? `
+                        <div class="info-item">
+                            <strong>Telefone:</strong>
+                            <p>${capitalizeText(pedido.telefone)}</p>
+                        </div>` : ''}
+                        ${pedido.email ? `
+                        <div class="info-item">
+                            <strong>E-mail:</strong>
+                            <p>${pedido.email}</p>
+                        </div>` : ''}
+                        ${pedido.contato ? `
+                        <div class="info-item">
+                            <strong>Contato:</strong>
+                            <p>${capitalizeText(pedido.contato)}</p>
+                        </div>` : ''}
+                        ${pedido.documento ? `
+                        <div class="info-item">
+                            <strong>Documento:</strong>
+                            <p>${capitalizeText(pedido.documento)}</p>
+                        </div>` : ''}
+                    </div>
+                </div>
+
+                <div class="tab-content" id="view-pedido">
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; margin-top: 0.5rem;">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Código</th>
+                                    <th>Especificação</th>
+                                    <th>Qtd</th>
+                                    <th>Valor Un</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pedido.items.map(item => `
+                                    <tr>
+                                        <td>${item.item}</td>
+                                        <td>${capitalizeText(item.codigoEstoque || '-')}</td>
+                                        <td>${capitalizeText(item.especificacao)}</td>
+                                        <td>${item.quantidade}</td>
+                                        <td>R$ ${item.valorUnitario.toFixed(2)}</td>
+                                        <td>${item.valorTotal}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="info-item" style="margin-top: 1.5rem; font-size: 1.1rem;">
+                        <strong>Valor Total:</strong>
+                        <p>${pedido.valor_total}</p>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="view-mercadoria">
+                    <div class="info-grid">
+                        ${pedido.peso ? `
+                        <div class="info-item">
+                            <strong>Peso:</strong>
+                            <p>${pedido.peso} Kg</p>
+                        </div>` : ''}
+                        ${pedido.quantidade ? `
+                        <div class="info-item">
+                            <strong>Quantidade:</strong>
+                            <p>${pedido.quantidade}</p>
+                        </div>` : ''}
+                        ${pedido.volumes ? `
+                        <div class="info-item">
+                            <strong>Volumes:</strong>
+                            <p>${pedido.volumes}</p>
+                        </div>` : ''}
+                    </div>
+                    ${!pedido.peso && !pedido.quantidade && !pedido.volumes ? '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhuma informação de mercadoria disponível</p>' : ''}
+                </div>
+
+                <div class="tab-content" id="view-entrega">
+                    <div class="info-grid">
+                        ${pedido.local_entrega ? `
+                        <div class="info-item">
+                            <strong>Local:</strong>
+                            <p>${capitalizeText(pedido.local_entrega)}</p>
+                        </div>` : ''}
+                        ${pedido.setor ? `
+                        <div class="info-item">
+                            <strong>Setor:</strong>
+                            <p>${capitalizeText(pedido.setor)}</p>
+                        </div>` : ''}
+                        ${pedido.previsao_entrega ? `
+                        <div class="info-item">
+                            <strong>Previsão de Entrega:</strong>
+                            <p>${new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR')}</p>
+                        </div>` : ''}
+                        ${pedido.transportadora ? `
+                        <div class="info-item">
+                            <strong>Transportadora:</strong>
+                            <p>${capitalizeText(pedido.transportadora)}</p>
+                        </div>` : ''}
+                        ${pedido.valor_frete ? `
+                        <div class="info-item">
+                            <strong>Valor do Frete:</strong>
+                            <p>${pedido.valor_frete}</p>
+                        </div>` : ''}
+                        ${pedido.vendedor ? `
+                        <div class="info-item">
+                            <strong>Vendedor:</strong>
+                            <p>${capitalizeText(pedido.vendedor)}</p>
+                        </div>` : ''}
+                        ${pedido.status === 'emitida' && pedido.data_emissao ? `
+                        <div class="info-item">
+                            <strong>Data de Emissão:</strong>
+                            <p>${new Date(pedido.data_emissao).toLocaleDateString('pt-BR')}</p>
+                        </div>` : ''}
+                    </div>
+                    ${!pedido.local_entrega && !pedido.setor && !pedido.transportadora && !pedido.vendedor ? '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhuma informação de entrega disponível</p>' : ''}
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeInfoModal()" class="secondary">Fechar</button>
+                </div>
+            </div>
         </div>
-        <p style="margin-top: 1rem; font-size: 1.1rem;"><strong>VALOR TOTAL:</strong> ${pedido.valor_total}</p>
-        
-        <h4 style="color: var(--primary); margin-bottom: 0.75rem; margin-top: 1.5rem;">MERCADORIA</h4>
-        ${pedido.peso ? `<p><strong>PESO:</strong> ${pedido.peso} KG</p>` : ''}
-        ${pedido.quantidade ? `<p><strong>QUANTIDADE:</strong> ${pedido.quantidade}</p>` : ''}
-        ${pedido.volumes ? `<p><strong>VOLUMES:</strong> ${pedido.volumes}</p>` : ''}
-        
-        <h4 style="color: var(--primary); margin-bottom: 0.75rem; margin-top: 1.5rem;">ENTREGA</h4>
-        ${pedido.local_entrega ? `<p><strong>LOCAL:</strong> ${toUpperCase(pedido.local_entrega)}</p>` : ''}
-        ${pedido.setor ? `<p><strong>SETOR:</strong> ${toUpperCase(pedido.setor)}</p>` : ''}
-        ${pedido.transportadora ? `<p><strong>TRANSPORTADORA:</strong> ${toUpperCase(pedido.transportadora)}</p>` : ''}
-        ${pedido.vendedor ? `<p><strong>VENDEDOR:</strong> ${toUpperCase(pedido.vendedor)}</p>` : ''}
-        ${pedido.status === 'emitida' && pedido.data_emissao ? `<p><strong>DATA DE EMISSÃO:</strong> ${new Date(pedido.data_emissao).toLocaleDateString('pt-BR')}</p>` : ''}
     `;
     
-    document.getElementById('infoContent').innerHTML = content;
-    document.getElementById('infoModal').classList.add('show');
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+function switchViewTab(tabId) {
+    document.querySelectorAll('#infoModal .tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#infoModal .tab-content').forEach(content => content.classList.remove('active'));
+    
+    event.target.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
 }
 
 function closeInfoModal() {
-    document.getElementById('infoModal').classList.remove('show');
+    const modal = document.getElementById('infoModal');
+    if (modal) {
+        modal.classList.remove('show');
+        setTimeout(() => modal.remove(), 200);
+    }
 }
 
 // ============================================
@@ -942,7 +1070,7 @@ function closeInfoModal() {
 async function editPedido(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) {
-        showToast('PEDIDO NÃO ENCONTRADO!', 'error');
+        showToast('Pedido não encontrado!', 'error');
         return;
     }
     
@@ -953,15 +1081,15 @@ async function editPedido(id) {
         <div class="modal-overlay" id="formModal" style="display: flex;">
             <div class="modal-content" style="max-width: 1400px;">
                 <div class="modal-header">
-                    <h3 class="modal-title">EDITAR PEDIDO DE FATURAMENTO</h3>
+                    <h3 class="modal-title">Editar Pedido de Faturamento</h3>
                     <button class="close-modal" onclick="closeFormModal()">✕</button>
                 </div>
                 
                 <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchTab('tab-faturamento')">FATURAMENTO</button>
-                    <button class="tab-btn" onclick="switchTab('tab-pedido')">PEDIDO</button>
-                    <button class="tab-btn" onclick="switchTab('tab-mercadoria')">MERCADORIA</button>
-                    <button class="tab-btn" onclick="switchTab('tab-entrega')">ENTREGA</button>
+                    <button class="tab-btn active" onclick="switchTab('tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn" onclick="switchTab('tab-pedido')">Pedido</button>
+                    <button class="tab-btn" onclick="switchTab('tab-mercadoria')">Mercadoria</button>
+                    <button class="tab-btn" onclick="switchTab('tab-entrega')">Entrega</button>
                 </div>
 
                 <form id="pedidoForm" onsubmit="handleSubmit(event)">
@@ -971,58 +1099,58 @@ async function editPedido(id) {
                     <div class="tab-content active" id="tab-faturamento">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="codigoEdit">CÓDIGO DO PEDIDO</label>
-                                <input type="number" id="codigoEdit" value="${pedido.codigo}" onchange="document.getElementById('codigoPedido').value = this.value">
+                                <label for="codigoEdit">Código do Pedido</label>
+                                <input type="number" id="codigoEdit" value="${pedido.codigo}" onchange="document.getElementById('codigoPedido').value = this.value" class="input-editable">
                             </div>
                             <div class="form-group">
                                 <label for="cnpj">CNPJ *</label>
                                 <input type="text" id="cnpj" value="${pedido.cnpj}" required onblur="buscarDadosCliente()">
                             </div>
                             <div class="form-group">
-                                <label for="razaoSocial">RAZÃO SOCIAL *</label>
+                                <label for="razaoSocial">Razão Social *</label>
                                 <input type="text" id="razaoSocial" value="${toUpperCase(pedido.razao_social)}" required>
                             </div>
                             <div class="form-group">
-                                <label for="inscricaoEstadual">INSCRIÇÃO ESTADUAL</label>
+                                <label for="inscricaoEstadual">Inscrição Estadual</label>
                                 <input type="text" id="inscricaoEstadual" value="${toUpperCase(pedido.inscricao_estadual || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="endereco">ENDEREÇO</label>
+                                <label for="endereco">Endereço</label>
                                 <input type="text" id="endereco" value="${toUpperCase(pedido.endereco || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="telefone">TELEFONE</label>
+                                <label for="telefone">Telefone</label>
                                 <input type="text" id="telefone" value="${toUpperCase(pedido.telefone || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="contato">CONTATO</label>
+                                <label for="contato">Contato</label>
                                 <input type="text" id="contato" value="${toUpperCase(pedido.contato || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="email">E-MAIL</label>
+                                <label for="email">E-mail</label>
                                 <input type="email" id="email" value="${pedido.email || ''}" style="text-transform: lowercase !important;">
                             </div>
                             <div class="form-group">
-                                <label for="documento">DOCUMENTO</label>
+                                <label for="documento">Documento</label>
                                 <input type="text" id="documento" value="${toUpperCase(pedido.documento || '')}">
                             </div>
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-pedido">
-                        <button type="button" onclick="addItem()" class="success small" style="margin-bottom: 1rem;">+ ADICIONAR ITEM</button>
+                        <button type="button" onclick="addItem()" class="success small" style="margin-bottom: 1rem;">+ Adicionar Item</button>
                         <div style="overflow-x: auto;">
                             <table class="items-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40px;">ITEM</th>
-                                        <th style="width: 120px;">CÓD. ESTOQUE</th>
-                                        <th style="min-width: 200px;">ESPECIFICAÇÃO</th>
-                                        <th style="width: 80px;">QTD</th>
-                                        <th style="width: 80px;">UNID</th>
+                                        <th style="width: 40px;">Item</th>
+                                        <th style="width: 120px;">Cód. Estoque</th>
+                                        <th style="min-width: 200px;">Especificação</th>
+                                        <th style="width: 80px;">Qtd</th>
+                                        <th style="width: 80px;">Unid</th>
                                         <th style="width: 100px;">NCM</th>
-                                        <th style="width: 100px;">VALOR UN</th>
-                                        <th style="width: 120px;">TOTAL</th>
+                                        <th style="width: 100px;">Valor Un</th>
+                                        <th style="width: 120px;">Total</th>
                                         <th style="width: 80px;"></th>
                                     </tr>
                                 </thead>
@@ -1030,23 +1158,23 @@ async function editPedido(id) {
                             </table>
                         </div>
                         <div class="form-group" style="margin-top: 1rem;">
-                            <label>VALOR TOTAL DO PEDIDO</label>
-                            <input type="text" id="valorTotalPedido" readonly value="${pedido.valor_total}">
+                            <label>Valor Total do Pedido</label>
+                            <input type="text" id="valorTotalPedido" readonly value="${pedido.valor_total}" class="input-editable">
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-mercadoria">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="peso">PESO (KG)</label>
+                                <label for="peso">Peso (Kg)</label>
                                 <input type="number" id="peso" step="0.01" min="0" value="${pedido.peso || 0}">
                             </div>
                             <div class="form-group">
-                                <label for="quantidade">QUANTIDADE TOTAL</label>
+                                <label for="quantidade">Quantidade Total</label>
                                 <input type="number" id="quantidade" min="0" value="${pedido.quantidade || 0}">
                             </div>
                             <div class="form-group">
-                                <label for="volumes">VOLUME(S)</label>
+                                <label for="volumes">Volume(s)</label>
                                 <input type="number" id="volumes" min="0" value="${pedido.volumes || 0}">
                             </div>
                         </div>
@@ -1055,35 +1183,35 @@ async function editPedido(id) {
                     <div class="tab-content" id="tab-entrega">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="localEntrega">LOCAL DE ENTREGA</label>
+                                <label for="localEntrega">Local de Entrega</label>
                                 <input type="text" id="localEntrega" value="${toUpperCase(pedido.local_entrega || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="setor">SETOR</label>
+                                <label for="setor">Setor</label>
                                 <input type="text" id="setor" value="${toUpperCase(pedido.setor || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="previsaoEntrega">PREVISÃO DE ENTREGA</label>
+                                <label for="previsaoEntrega">Previsão de Entrega</label>
                                 <input type="date" id="previsaoEntrega" value="${pedido.previsao_entrega || ''}">
                             </div>
                             <div class="form-group">
-                                <label for="transportadora">TRANSPORTADORA</label>
+                                <label for="transportadora">Transportadora</label>
                                 <input type="text" id="transportadora" value="${toUpperCase(pedido.transportadora || '')}">
                             </div>
                             <div class="form-group">
-                                <label for="valorFrete">VALOR DO FRETE</label>
+                                <label for="valorFrete">Valor do Frete</label>
                                 <input type="text" id="valorFrete" value="${pedido.valor_frete || ''}">
                             </div>
                             <div class="form-group">
-                                <label for="vendedor">VENDEDOR</label>
+                                <label for="vendedor">Vendedor</label>
                                 <input type="text" id="vendedor" value="${toUpperCase(pedido.vendedor || '')}">
                             </div>
                         </div>
                     </div>
 
                     <div class="modal-actions">
-                        <button type="submit" style="background: var(--btn-save);">ATUALIZAR PEDIDO</button>
-                        <button type="button" onclick="closeFormModal()" class="secondary">CANCELAR</button>
+                        <button type="submit" style="background: var(--btn-save);">Atualizar Pedido</button>
+                        <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
                     </div>
                 </form>
             </div>
@@ -1113,14 +1241,14 @@ async function editPedido(id) {
     setTimeout(() => document.getElementById('razaoSocial').focus(), 100);
 }
 
-// EMITIR PEDIDO (Botão Emitir - sem funcionalidade ainda)
+// EMITIR PEDIDO (Botão verde sem ação)
 function emitirPedido(id) {
-    showToast('BOTÃO EMITIR EM DESENVOLVIMENTO', 'error');
+    // Botão verde sem funcionalidade por enquanto
 }
 
 // EXCLUIR PEDIDO
 async function deletePedido(id) {
-    if (!confirm('TEM CERTEZA QUE DESEJA EXCLUIR ESTE PEDIDO?')) return;
+    if (!confirm('Tem certeza que deseja excluir este pedido?')) return;
     
     try {
         const response = await fetch(`${API_URL}/pedidos/${id}`, {
@@ -1130,16 +1258,16 @@ async function deletePedido(id) {
 
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            mostrarTelaAcessoNegado('Sua Sessão Expirou');
             return;
         }
         
-        if (!response.ok) throw new Error('ERRO AO EXCLUIR');
+        if (!response.ok) throw new Error('Erro ao excluir');
         
-        showToast('PEDIDO EXCLUÍDO COM SUCESSO!', 'success');
+        showToast('Pedido excluído com sucesso!', 'success');
         await loadPedidos();
     } catch (error) {
-        showToast('ERRO AO EXCLUIR PEDIDO', 'error');
+        showToast('Erro ao excluir pedido', 'error');
     }
 }
 
