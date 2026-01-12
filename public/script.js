@@ -394,7 +394,7 @@ function updateVendedoresFilter() {
     const select = document.getElementById('filterVendedor');
     if (select) {
         const currentValue = select.value;
-        select.innerHTML = '<option value="">Todos</option>';
+        select.innerHTML = '<option value="">Responsável</option>';
         Array.from(vendedores).sort().forEach(v => {
             const option = document.createElement('option');
             option.value = v;
@@ -445,7 +445,7 @@ function updateTable() {
     }
     
     container.innerHTML = filtered.map(pedido => `
-        <tr class="${pedido.status === 'emitida' ? 'row-emitida' : ''}">
+        <tr class="${pedido.status === 'emitida' ? 'row-fechada' : ''}">
             <td style="text-align: center;">
                 <div class="checkbox-wrapper">
                     <input type="checkbox" 
@@ -462,13 +462,13 @@ function updateTable() {
             <td>${pedido.vendedor || '-'}</td>
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
-                <span class="badge ${pedido.status}">
-                    ${pedido.status === 'emitida' ? 'EMITIDA' : 'PENDENTE'}
+                <span class="badge ${pedido.status === 'emitida' ? 'fechada' : 'aberta'}">
+                    ${pedido.status === 'emitida' ? 'Fechada' : 'Aberta'}
                 </span>
             </td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: #F97316;">
+                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: #F59E0B;">
                         Ver
                     </button>
                     <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: #6B7280;">
