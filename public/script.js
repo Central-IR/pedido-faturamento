@@ -463,15 +463,15 @@ function updateTable() {
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
                 <span class="badge ${pedido.status}">
-                    ${pedido.status === 'emitida' ? 'Emitida' : 'Pendente'}
+                    ${pedido.status === 'emitida' ? 'EMITIDA' : 'PENDENTE'}
                 </span>
             </td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: var(--btn-view);">
+                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: #F97316;">
                         Ver
                     </button>
-                    <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: var(--btn-edit);">
+                    <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: #6B7280;">
                         Editar
                     </button>
                 </div>
