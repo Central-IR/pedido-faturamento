@@ -193,7 +193,6 @@ async function syncData() {
     if (btnSync) {
         btnSync.disabled = true;
         btnSync.style.opacity = '0.5';
-        btnSync.querySelector('svg').style.animation = 'spin 1s linear infinite';
     }
     
     try {
@@ -206,7 +205,6 @@ async function syncData() {
         if (btnSync) {
             btnSync.disabled = false;
             btnSync.style.opacity = '1';
-            btnSync.querySelector('svg').style.animation = '';
         }
     }
 }
@@ -324,11 +322,54 @@ function buscarClientePorCNPJ(cnpj) {
         const div = document.createElement('div');
         div.className = 'autocomplete-item';
         div.innerHTML = `<strong>${formatarCNPJ(cnpjKey)}</strong><br>${cliente.razaoSocial}`;
-        div.onclick = () => preencherDadosCliente(cnpjKey);
+        div.onclick = () => preencherDadosClienteCompleto(cnpjKey);
         suggestionsDiv.appendChild(div);
     });
     
     suggestionsDiv.style.display = 'block';
+}
+
+function preencherDadosClienteCompleto(cnpj) {
+    // Buscar o último pedido com este CNPJ
+    const pedidosComCNPJ = pedidos.filter(p => p.cnpj === cnpj);
+    
+    if (pedidosComCNPJ.length === 0) {
+        // Se não houver pedidos, usar cache básico
+        preencherDadosCliente(cnpj);
+        return;
+    }
+    
+    // Pegar o último pedido (mais recente)
+    const ultimoPedido = pedidosComCNPJ.sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+    )[0];
+    
+    // Preencher TODOS os dados de todas as abas
+    document.getElementById('cnpj').value = formatarCNPJ(cnpj);
+    document.getElementById('razaoSocial').value = ultimoPedido.razao_social || '';
+    document.getElementById('inscricaoEstadual').value = ultimoPedido.inscricao_estadual || '';
+    document.getElementById('endereco').value = ultimoPedido.endereco || '';
+    document.getElementById('telefone').value = ultimoPedido.telefone || '';
+    document.getElementById('contato').value = ultimoPedido.contato || '';
+    document.getElementById('email').value = ultimoPedido.email || '';
+    document.getElementById('documento').value = ultimoPedido.documento || '';
+    
+    // Aba Entrega
+    document.getElementById('localEntrega').value = ultimoPedido.local_entrega || '';
+    document.getElementById('setor').value = ultimoPedido.setor || '';
+    if (ultimoPedido.previsao_entrega) {
+        document.getElementById('previsaoEntrega').value = ultimoPedido.previsao_entrega;
+    }
+    
+    // Aba Transporte
+    document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
+    document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
+    document.getElementById('vendedor').value = ultimoPedido.vendedor || '';
+    document.getElementById('peso').value = ultimoPedido.peso || '';
+    document.getElementById('volumes').value = ultimoPedido.volumes || '';
+    
+    document.getElementById('cnpjSuggestions').style.display = 'none';
+    showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
 }
 
 function preencherDadosCliente(cnpj) {
@@ -474,6 +515,9 @@ function updateTable() {
                     <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: #6B7280;">
                         Editar
                     </button>
+                    <button onclick="deletePedido(${pedido.id})" class="action-btn" style="background: #EF4444;">
+                        Excluir
+                    </button>
                 </div>
             </td>
         </tr>
@@ -545,6 +589,7 @@ function addItem() {
                    class="codigo-estoque"
                    placeholder="CÓDIGO"
                    onblur="verificarEstoque(${itemCounter})"
+                   onchange="buscarDadosEstoque(${itemCounter})"
                    required>
             <div id="estoque-warning-${itemCounter}" style="color: var(--alert-color); font-size: 0.75rem; margin-top: 4px; display: none;"></div>
         </td>
@@ -619,6 +664,30 @@ function calcularTotais() {
     
     document.getElementById('valorTotalPedido').value = formatarMoeda(valorTotal);
     document.getElementById('quantidade').value = quantidadeTotal;
+}
+
+function buscarDadosEstoque(itemId) {
+    const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
+    const especificacaoInput = document.getElementById(`especificacao-${itemId}`);
+    const ncmInput = document.getElementById(`ncm-${itemId}`);
+    
+    if (!codigoInput || !especificacaoInput || !ncmInput) return;
+    
+    const codigo = codigoInput.value.trim().toUpperCase();
+    
+    if (!codigo) return;
+    
+    const itemEstoque = estoqueCache[codigo];
+    
+    if (itemEstoque) {
+        // Preencher descrição e NCM se existirem no estoque
+        if (itemEstoque.descricao && !especificacaoInput.value) {
+            especificacaoInput.value = itemEstoque.descricao;
+        }
+        if (itemEstoque.ncm && !ncmInput.value) {
+            ncmInput.value = itemEstoque.ncm;
+        }
+    }
 }
 
 function verificarEstoque(itemId) {
@@ -813,6 +882,35 @@ async function savePedido() {
 }
 
 // ============================================
+// DELETAR PEDIDO
+// ============================================
+async function deletePedido(id) {
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) return;
+    
+    if (!confirm(`Tem certeza que deseja excluir o pedido ${pedido.codigo}?\n\nEsta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Session-Token': sessionToken
+            }
+        });
+        
+        if (!response.ok) throw new Error('Erro ao excluir pedido');
+        
+        await loadPedidos();
+        showMessage(`Pedido ${pedido.codigo} excluído com sucesso!`, 'success');
+    } catch (error) {
+        console.error('Erro ao excluir:', error);
+        showMessage('Erro ao excluir pedido!', 'error');
+    }
+}
+
+// ============================================
 // EDITAR PEDIDO
 // ============================================
 async function editPedido(id) {
@@ -865,6 +963,7 @@ async function editPedido(id) {
                            value="${item.codigoEstoque || ''}"
                            class="codigo-estoque"
                            onblur="verificarEstoque(${itemCounter})"
+                           onchange="buscarDadosEstoque(${itemCounter})"
                            required>
                     <div id="estoque-warning-${itemCounter}" style="color: var(--alert-color); font-size: 0.75rem; margin-top: 4px; display: none;"></div>
                 </td>
@@ -1250,7 +1349,7 @@ function imprimirEtiquetas() {
         labelsContent += `
             <div class='label-container'>
                 <div class='logo-container'>
-                    <img src='etiqueta.png' alt='Logo' onerror="this.style.display='none'">
+                    <img src='ETIQUETA.png' alt='Logo' style='max-width: 100px; max-height: 100px; margin-right: 15px;'>
                     <div>
                         <div class='header'>I.R COMÉRCIO E <br>MATERIAIS ELÉTRICOS LTDA</div>
                         <div class='cnpj'>CNPJ: 33.149.502/0001-38</div>
