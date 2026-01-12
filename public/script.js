@@ -118,18 +118,6 @@ async function inicializarApp() {
     await loadPedidos();
     await loadEstoque();
     
-    // Auto-completar inputs para uppercase
-    document.querySelectorAll('input:not([type="checkbox"]):not([type="date"]):not([type="email"]):not([readonly]), textarea:not([readonly])').forEach(input => {
-        input.addEventListener('input', (e) => {
-            if (e.target.id !== 'email' && e.target.id !== 'valorUnitario' && !e.target.id.includes('valor')) {
-                const start = e.target.selectionStart;
-                const end = e.target.selectionEnd;
-                e.target.value = e.target.value.toUpperCase();
-                e.target.setSelectionRange(start, end);
-            }
-        });
-    });
-    
     // Formatar CNPJ
     document.getElementById('cnpj')?.addEventListener('input', (e) => {
         e.target.value = formatarCNPJ(e.target.value);
@@ -201,9 +189,26 @@ async function syncData() {
         return;
     }
     
-    await loadPedidos();
-    await loadEstoque();
-    showMessage('Dados sincronizados com sucesso!', 'success');
+    const btnSync = document.getElementById('btnSync');
+    if (btnSync) {
+        btnSync.disabled = true;
+        btnSync.style.opacity = '0.5';
+        btnSync.querySelector('svg').style.animation = 'spin 1s linear infinite';
+    }
+    
+    try {
+        await loadPedidos();
+        await loadEstoque();
+        showMessage('Dados sincronizados com sucesso!', 'success');
+    } catch (error) {
+        showMessage('Erro ao sincronizar dados!', 'error');
+    } finally {
+        if (btnSync) {
+            btnSync.disabled = false;
+            btnSync.style.opacity = '1';
+            btnSync.querySelector('svg').style.animation = '';
+        }
+    }
 }
 
 // ============================================
@@ -251,7 +256,7 @@ async function loadEstoque() {
             const items = await response.json();
             estoqueCache = {};
             items.forEach(item => {
-                estoqueCache[toUpperCase(item.codigo)] = item;
+                estoqueCache[item.codigo.toUpperCase()] = item;
             });
             console.log(`📦 ${Object.keys(estoqueCache).length} itens carregados do estoque`);
         }
@@ -266,21 +271,21 @@ async function loadEstoque() {
 function atualizarCacheClientes(pedidos) {
     clientesCache = {};
     pedidos.forEach(pedido => {
-        const cnpj = toUpperCase(pedido.cnpj?.trim());
+        const cnpj = pedido.cnpj?.trim();
         if (cnpj && !clientesCache[cnpj]) {
             clientesCache[cnpj] = {
-                razaoSocial: toUpperCase(pedido.razao_social),
-                inscricaoEstadual: toUpperCase(pedido.inscricao_estadual),
-                endereco: toUpperCase(pedido.endereco),
-                telefone: toUpperCase(pedido.telefone),
-                contato: toUpperCase(pedido.contato),
-                email: pedido.email ? pedido.email.toLowerCase() : '',
-                documento: toUpperCase(pedido.documento),
-                localEntrega: toUpperCase(pedido.local_entrega),
-                setor: toUpperCase(pedido.setor),
-                transportadora: toUpperCase(pedido.transportadora),
+                razaoSocial: pedido.razao_social,
+                inscricaoEstadual: pedido.inscricao_estadual,
+                endereco: pedido.endereco,
+                telefone: pedido.telefone,
+                contato: pedido.contato,
+                email: pedido.email || '',
+                documento: pedido.documento,
+                localEntrega: pedido.local_entrega,
+                setor: pedido.setor,
+                transportadora: pedido.transportadora,
                 valorFrete: pedido.valor_frete,
-                vendedor: toUpperCase(pedido.vendedor),
+                vendedor: pedido.vendedor,
                 peso: pedido.peso,
                 quantidade: pedido.quantidade,
                 volumes: pedido.volumes,
@@ -382,14 +387,14 @@ function updateVendedoresFilter() {
     const vendedores = new Set();
     pedidos.forEach(p => {
         if (p.vendedor?.trim()) {
-            vendedores.add(toUpperCase(p.vendedor.trim()));
+            vendedores.add(p.vendedor.trim());
         }
     });
 
     const select = document.getElementById('filterVendedor');
     if (select) {
         const currentValue = select.value;
-        select.innerHTML = '<option value="">TODOS</option>';
+        select.innerHTML = '<option value="">Todos</option>';
         Array.from(vendedores).sort().forEach(v => {
             const option = document.createElement('option');
             option.value = v;
@@ -421,13 +426,13 @@ function updateTable() {
     if (search) {
         filtered = filtered.filter(p => 
             p.codigo?.toString().includes(search) ||
-            toUpperCase(p.cnpj || '').toLowerCase().includes(search) ||
-            toUpperCase(p.razao_social || '').toLowerCase().includes(search)
+            (p.cnpj || '').toLowerCase().includes(search) ||
+            (p.razao_social || '').toLowerCase().includes(search)
         );
     }
     
     if (filterVendedor) {
-        filtered = filtered.filter(p => toUpperCase(p.vendedor || '') === filterVendedor);
+        filtered = filtered.filter(p => (p.vendedor || '') === filterVendedor);
     }
     
     if (filterStatus) {
@@ -435,7 +440,7 @@ function updateTable() {
     }
     
     if (filtered.length === 0) {
-        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">NENHUM PEDIDO ENCONTRADO</td></tr>';
+        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado</td></tr>';
         return;
     }
     
@@ -452,13 +457,13 @@ function updateTable() {
                 </div>
             </td>
             <td><strong>${pedido.codigo}</strong></td>
-            <td>${toUpperCase(pedido.razao_social)}</td>
+            <td>${pedido.razao_social}</td>
             <td>${formatarCNPJ(pedido.cnpj)}</td>
-            <td>${toUpperCase(pedido.vendedor || '-')}</td>
+            <td>${pedido.vendedor || '-'}</td>
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
                 <span class="badge ${pedido.status}">
-                    ${pedido.status === 'emitida' ? 'EMITIDA' : 'PENDENTE'}
+                    ${pedido.status === 'emitida' ? 'Emitida' : 'Pendente'}
                 </span>
             </td>
             <td>
@@ -623,7 +628,7 @@ function verificarEstoque(itemId) {
     
     if (!codigoInput || !quantidadeInput || !warningDiv) return;
     
-    const codigo = toUpperCase(codigoInput.value.trim());
+    const codigo = codigoInput.value.trim().toUpperCase();
     const quantidadeSolicitada = parseFloat(quantidadeInput.value) || 0;
     
     if (!codigo || quantidadeSolicitada === 0) {
@@ -634,7 +639,7 @@ function verificarEstoque(itemId) {
     const itemEstoque = estoqueCache[codigo];
     
     if (!itemEstoque) {
-        warningDiv.textContent = `⚠️ CÓDIGO ${codigo} NÃO ENCONTRADO NO ESTOQUE`;
+        warningDiv.textContent = `⚠️ Código ${codigo} não encontrado no estoque`;
         warningDiv.style.display = 'block';
         return;
     }
@@ -642,7 +647,7 @@ function verificarEstoque(itemId) {
     const quantidadeDisponivel = parseFloat(itemEstoque.quantidade_disponivel) || 0;
     
     if (quantidadeSolicitada > quantidadeDisponivel) {
-        warningDiv.textContent = `⚠️ ITEM [${codigo}] É INSUFICIENTE (Disponível: ${quantidadeDisponivel})`;
+        warningDiv.textContent = `⚠️ Item [${codigo}] é insuficiente (Disponível: ${quantidadeDisponivel})`;
         warningDiv.style.display = 'block';
     } else {
         warningDiv.style.display = 'none';
@@ -653,13 +658,13 @@ function getItems() {
     const items = [];
     document.querySelectorAll('[id^="item-"]').forEach(item => {
         const id = item.id.replace('item-', '');
-        const codigoEstoque = toUpperCase(document.getElementById(`codigoEstoque-${id}`).value.trim());
-        const especificacao = toUpperCase(document.getElementById(`especificacao-${id}`).value.trim());
+        const codigoEstoque = document.getElementById(`codigoEstoque-${id}`).value.trim().toUpperCase();
+        const especificacao = document.getElementById(`especificacao-${id}`).value.trim();
         const unidade = document.getElementById(`unidade-${id}`).value;
         const quantidade = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
         const valorUnitario = parseFloat(document.getElementById(`valorUnitario-${id}`).value) || 0;
         const valorTotal = document.getElementById(`valorTotal-${id}`).value;
-        const ncm = toUpperCase(document.getElementById(`ncm-${id}`).value.trim());
+        const ncm = document.getElementById(`ncm-${id}`).value.trim();
         
         if (codigoEstoque && unidade && quantidade > 0) {
             items.push({
@@ -720,9 +725,9 @@ async function savePedido() {
     // Validações básicas
     const codigo = document.getElementById('codigo').value.trim();
     const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
-    const razaoSocial = toUpperCase(document.getElementById('razaoSocial').value.trim());
-    const endereco = toUpperCase(document.getElementById('endereco').value.trim());
-    const vendedor = toUpperCase(document.getElementById('vendedor').value.trim());
+    const razaoSocial = document.getElementById('razaoSocial').value.trim();
+    const endereco = document.getElementById('endereco').value.trim();
+    const vendedor = document.getElementById('vendedor').value.trim();
     
     if (!codigo || !cnpj || !razaoSocial || !endereco || !vendedor) {
         showMessage('Preencha todos os campos obrigatórios!', 'error');
@@ -738,7 +743,7 @@ async function savePedido() {
     // Verificar estoque
     let estoqueInsuficiente = false;
     items.forEach(item => {
-        const itemEstoque = estoqueCache[item.codigoEstoque];
+        const itemEstoque = estoqueCache[item.codigoEstoque.toUpperCase()];
         if (!itemEstoque) {
             showMessage(`Código ${item.codigoEstoque} não encontrado no estoque!`, 'error');
             estoqueInsuficiente = true;
@@ -758,21 +763,21 @@ async function savePedido() {
         codigo,
         cnpj,
         razao_social: razaoSocial,
-        inscricao_estadual: toUpperCase(document.getElementById('inscricaoEstadual').value.trim()),
+        inscricao_estadual: document.getElementById('inscricaoEstadual').value.trim(),
         endereco,
-        telefone: toUpperCase(document.getElementById('telefone').value.trim()),
-        contato: toUpperCase(document.getElementById('contato').value.trim()),
+        telefone: document.getElementById('telefone').value.trim(),
+        contato: document.getElementById('contato').value.trim(),
         email: document.getElementById('email').value.trim().toLowerCase(),
-        documento: toUpperCase(document.getElementById('documento').value.trim()),
+        documento: document.getElementById('documento').value.trim(),
         items,
         valor_total: document.getElementById('valorTotalPedido').value,
         peso: document.getElementById('peso').value,
         quantidade: document.getElementById('quantidade').value,
         volumes: document.getElementById('volumes').value,
-        local_entrega: toUpperCase(document.getElementById('localEntrega').value.trim()),
-        setor: toUpperCase(document.getElementById('setor').value.trim()),
+        local_entrega: document.getElementById('localEntrega').value.trim(),
+        setor: document.getElementById('setor').value.trim(),
         previsao_entrega: document.getElementById('previsaoEntrega').value,
-        transportadora: toUpperCase(document.getElementById('transportadora').value.trim()),
+        transportadora: document.getElementById('transportadora').value.trim(),
         valor_frete: document.getElementById('valorFrete').value,
         vendedor,
         status: 'pendente'
@@ -821,23 +826,23 @@ async function editPedido(id) {
     // Preencher campos
     document.getElementById('codigo').value = pedido.codigo;
     document.getElementById('cnpj').value = formatarCNPJ(pedido.cnpj);
-    document.getElementById('razaoSocial').value = toUpperCase(pedido.razao_social);
-    document.getElementById('inscricaoEstadual').value = toUpperCase(pedido.inscricao_estadual || '');
-    document.getElementById('endereco').value = toUpperCase(pedido.endereco);
-    document.getElementById('telefone').value = toUpperCase(pedido.telefone || '');
-    document.getElementById('contato').value = toUpperCase(pedido.contato || '');
+    document.getElementById('razaoSocial').value = pedido.razao_social;
+    document.getElementById('inscricaoEstadual').value = pedido.inscricao_estadual || '';
+    document.getElementById('endereco').value = pedido.endereco;
+    document.getElementById('telefone').value = pedido.telefone || '';
+    document.getElementById('contato').value = pedido.contato || '';
     document.getElementById('email').value = pedido.email || '';
-    document.getElementById('documento').value = toUpperCase(pedido.documento || '');
+    document.getElementById('documento').value = pedido.documento || '';
     document.getElementById('valorTotalPedido').value = pedido.valor_total;
     document.getElementById('peso').value = pedido.peso || '';
     document.getElementById('quantidade').value = pedido.quantidade || '';
     document.getElementById('volumes').value = pedido.volumes || '';
-    document.getElementById('localEntrega').value = toUpperCase(pedido.local_entrega || '');
-    document.getElementById('setor').value = toUpperCase(pedido.setor || '');
+    document.getElementById('localEntrega').value = pedido.local_entrega || '';
+    document.getElementById('setor').value = pedido.setor || '';
     document.getElementById('previsaoEntrega').value = pedido.previsao_entrega || '';
-    document.getElementById('transportadora').value = toUpperCase(pedido.transportadora || '');
+    document.getElementById('transportadora').value = pedido.transportadora || '';
     document.getElementById('valorFrete').value = pedido.valor_frete || '';
-    document.getElementById('vendedor').value = toUpperCase(pedido.vendedor || '');
+    document.getElementById('vendedor').value = pedido.vendedor || '';
     
     // Preencher itens
     document.getElementById('itemsContainer').innerHTML = '';
@@ -930,23 +935,23 @@ function viewPedido(id) {
             </div>
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>Razão Social</label>
-                <input type="text" value="${toUpperCase(pedido.razao_social)}" readonly>
+                <input type="text" value="${pedido.razao_social}" readonly>
             </div>
             <div class="form-group">
                 <label>Inscrição Estadual</label>
-                <input type="text" value="${toUpperCase(pedido.inscricao_estadual || '-')}" readonly>
+                <input type="text" value="${pedido.inscricao_estadual || '-'}" readonly>
             </div>
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>Endereço</label>
-                <input type="text" value="${toUpperCase(pedido.endereco)}" readonly>
+                <input type="text" value="${pedido.endereco}" readonly>
             </div>
             <div class="form-group">
                 <label>Telefone</label>
-                <input type="text" value="${toUpperCase(pedido.telefone || '-')}" readonly>
+                <input type="text" value="${pedido.telefone || '-'}" readonly>
             </div>
             <div class="form-group">
                 <label>Contato</label>
-                <input type="text" value="${toUpperCase(pedido.contato || '-')}" readonly>
+                <input type="text" value="${pedido.contato || '-'}" readonly>
             </div>
             <div class="form-group">
                 <label>E-mail</label>
@@ -954,7 +959,7 @@ function viewPedido(id) {
             </div>
             <div class="form-group">
                 <label>Documento</label>
-                <input type="text" value="${toUpperCase(pedido.documento || '-')}" readonly>
+                <input type="text" value="${pedido.documento || '-'}" readonly>
             </div>
         </div>
     `;
@@ -962,36 +967,34 @@ function viewPedido(id) {
     // Tab Itens
     const items = Array.isArray(pedido.items) ? pedido.items : [];
     document.getElementById('info-tab-itens').innerHTML = `
-        <div style="overflow-x: auto;">
-            <table class="items-table">
-                <thead>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Cód. Estoque</th>
+                    <th>Especificação</th>
+                    <th>UN</th>
+                    <th>Quantidade</th>
+                    <th>Valor Unitário</th>
+                    <th>Valor Total</th>
+                    <th>NCM</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((item, index) => `
                     <tr>
-                        <th>Item</th>
-                        <th>Cód. Estoque</th>
-                        <th>Especificação</th>
-                        <th>UN</th>
-                        <th>Quantidade</th>
-                        <th>Valor Unitário</th>
-                        <th>Valor Total</th>
-                        <th>NCM</th>
+                        <td>${index + 1}</td>
+                        <td>${item.codigoEstoque || '-'}</td>
+                        <td>${item.especificacao || '-'}</td>
+                        <td>${item.unidade || '-'}</td>
+                        <td>${item.quantidade || 0}</td>
+                        <td>${formatarMoeda(item.valorUnitario || 0)}</td>
+                        <td>${item.valorTotal || 'R$ 0,00'}</td>
+                        <td>${item.ncm || '-'}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    ${items.map((item, index) => `
-                        <tr>
-                            <td>${index + 1}</td>
-                            <td>${item.codigoEstoque || '-'}</td>
-                            <td>${item.especificacao || '-'}</td>
-                            <td>${item.unidade || '-'}</td>
-                            <td>${item.quantidade || 0}</td>
-                            <td>${formatarMoeda(item.valorUnitario || 0)}</td>
-                            <td>${item.valorTotal || 'R$ 0,00'}</td>
-                            <td>${item.ncm || '-'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
+                `).join('')}
+            </tbody>
+        </table>
         <div class="form-grid" style="margin-top: 1.5rem;">
             <div class="form-group">
                 <label>Valor Total</label>
@@ -1017,11 +1020,11 @@ function viewPedido(id) {
         <div class="form-grid">
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>Local de Entrega</label>
-                <textarea readonly rows="3">${toUpperCase(pedido.local_entrega || '-')}</textarea>
+                <textarea readonly rows="3">${pedido.local_entrega || '-'}</textarea>
             </div>
             <div class="form-group">
                 <label>Setor</label>
-                <input type="text" value="${toUpperCase(pedido.setor || '-')}" readonly>
+                <input type="text" value="${pedido.setor || '-'}" readonly>
             </div>
             <div class="form-group">
                 <label>Previsão de Entrega</label>
@@ -1035,7 +1038,7 @@ function viewPedido(id) {
         <div class="form-grid">
             <div class="form-group">
                 <label>Transportadora</label>
-                <input type="text" value="${toUpperCase(pedido.transportadora || '-')}" readonly>
+                <input type="text" value="${pedido.transportadora || '-'}" readonly>
             </div>
             <div class="form-group">
                 <label>Valor do Frete</label>
@@ -1043,11 +1046,11 @@ function viewPedido(id) {
             </div>
             <div class="form-group">
                 <label>Vendedor</label>
-                <input type="text" value="${toUpperCase(pedido.vendedor || '-')}" readonly>
+                <input type="text" value="${pedido.vendedor || '-'}" readonly>
             </div>
             <div class="form-group">
                 <label>Status</label>
-                <input type="text" value="${pedido.status === 'emitida' ? 'EMITIDA' : 'PENDENTE'}" readonly>
+                <input type="text" value="${pedido.status === 'emitida' ? 'Emitida' : 'Pendente'}" readonly>
             </div>
         </div>
     `;
@@ -1212,8 +1215,158 @@ async function toggleEmissao(id, checked) {
 }
 
 // ============================================
-// EXPORTAR PDF (PLACEHOLDER)
+// ETIQUETAS
 // ============================================
-function exportarPDF() {
-    showMessage('Funcionalidade de exportação em desenvolvimento', 'success');
+function abrirModalEtiquetas() {
+    document.getElementById('etiquetaModal').classList.add('show');
+}
+
+function closeEtiquetaModal() {
+    document.getElementById('etiquetaModal').classList.remove('show');
+    document.getElementById('etiquetaNF').value = '';
+    document.getElementById('etiquetaVolumes').value = '';
+    document.getElementById('etiquetaDestinatario').value = '';
+    document.getElementById('etiquetaMunicipio').value = '';
+    document.getElementById('etiquetaEndereco').value = '';
+    document.getElementById('etiquetaInfo').value = '';
+}
+
+function imprimirEtiquetas() {
+    const nf = document.getElementById('etiquetaNF').value.trim();
+    const totalVolumes = parseInt(document.getElementById('etiquetaVolumes').value);
+    const destinatario = document.getElementById('etiquetaDestinatario').value.trim();
+    const municipio = document.getElementById('etiquetaMunicipio').value.trim();
+    const endereco = document.getElementById('etiquetaEndereco').value.trim();
+    const infoAdicional = document.getElementById('etiquetaInfo').value.trim();
+    
+    if (!nf || !totalVolumes || !destinatario || !municipio || !endereco) {
+        showMessage('Preencha todos os campos obrigatórios!', 'error');
+        return;
+    }
+    
+    let labelsContent = '';
+    
+    for (let i = 1; i <= totalVolumes; i++) {
+        labelsContent += `
+            <div class='label-container'>
+                <div class='logo-container'>
+                    <img src='etiqueta.png' alt='Logo' onerror="this.style.display='none'">
+                    <div>
+                        <div class='header'>I.R COMÉRCIO E <br>MATERIAIS ELÉTRICOS LTDA</div>
+                        <div class='cnpj'>CNPJ: 33.149.502/0001-38</div>
+                    </div>
+                </div>
+                <div class='nf-volume-container'>
+                    <div class='nf-volume'>NF: ${nf}</div>
+                    <div class='volume'>VOLUME: ${i}/${totalVolumes}</div>
+                </div>
+                <hr>
+                <div class='section-title'>DESTINATÁRIO:</div>
+                <div class='section'>${destinatario}</div>
+                <div class='section'>${municipio}</div>
+                <div class='section'>${endereco}</div>
+                ${infoAdicional ? `<div class='section-title additional-info'>LOCAL DE ENTREGA:</div><div class='section'>${infoAdicional}</div>` : ""}
+            </div>
+        `;
+    }
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Etiquetas NF ${nf}</title>
+            <style>
+                @page {
+                    size: 100mm 150mm;
+                    margin: 2mm;
+                }
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    font-size: 12px;
+                    text-align: left;
+                    margin: 0;
+                    padding: 0;
+                }
+                .label-container {
+                    width: 94mm;
+                    height: 144mm;
+                    padding: 2mm;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-start;
+                    overflow: hidden;
+                    page-break-after: always;
+                }
+                .logo-container {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 10px;
+                }
+                .logo-container img {
+                    max-width: 100px;
+                    max-height: 100px;
+                    margin-right: 15px;
+                }
+                .header, .cnpj, .section-title {
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                .header {
+                    font-size: 14px;
+                    line-height: 1.2;
+                }
+                .cnpj {
+                    font-size: 12px;
+                }
+                .nf-volume-container {
+                    text-align: center;
+                    border: 1px solid black;
+                    padding: 5px;
+                    margin: 10px 0;
+                }
+                .nf-volume {
+                    font-size: 30px;
+                    font-weight: bold;
+                    margin-bottom: 2px;
+                }
+                .volume {
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                .section {
+                    line-height: 1.2;
+                    word-wrap: break-word;
+                    margin-top: 2px;
+                }
+                .additional-info {
+                    margin-top: 10px;
+                }
+                hr {
+                    border: none;
+                    border-top: 1px solid #000;
+                    margin: 10px 0;
+                }
+            </style>
+        </head>
+        <body>
+            ${labelsContent}
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                        window.onafterprint = function() { 
+                            window.close(); 
+                        };
+                    }, 500);
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    
+    closeEtiquetaModal();
+    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
 }
