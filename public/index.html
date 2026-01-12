@@ -116,16 +116,13 @@
                         </div>
                     </div>
 
-                    <button class="calendar-btn" onclick="exportarPDF()" title="Exportar PDF">
+                    <button class="calendar-btn" onclick="abrirModalEtiquetas()" title="Gerar Etiquetas">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                            <line x1="7" y1="7" x2="7.01" y2="7"></line>
                         </svg>
                     </button>
-                    <button class="calendar-btn" onclick="syncData()" title="Sincronizar">
+                    <button class="calendar-btn" onclick="syncData()" title="Sincronizar" id="btnSync">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="23 4 23 10 17 10"></polyline>
                             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -227,24 +224,22 @@
                         </svg>
                         Adicionar Item
                     </button>
-                    <div style="overflow-x: auto;">
-                        <table class="items-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 50px;">Item</th>
-                                    <th style="width: 120px;">Cód. Estoque *</th>
-                                    <th style="width: 250px;">Especificação</th>
-                                    <th style="width: 80px;">UN *</th>
-                                    <th style="width: 100px;">Qtd *</th>
-                                    <th style="width: 120px;">Valor Un. (R$)</th>
-                                    <th style="width: 120px;">Valor Total</th>
-                                    <th style="width: 120px;">NCM</th>
-                                    <th style="width: 50px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemsContainer"></tbody>
-                        </table>
-                    </div>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">Item</th>
+                                <th style="width: 100px;">Cód. Estoque *</th>
+                                <th style="width: 200px;">Especificação</th>
+                                <th style="width: 70px;">UN *</th>
+                                <th style="width: 80px;">Qtd *</th>
+                                <th style="width: 100px;">Valor Un. (R$)</th>
+                                <th style="width: 110px;">Valor Total</th>
+                                <th style="width: 100px;">NCM</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsContainer"></tbody>
+                    </table>
                     <div class="form-grid" style="margin-top: 1.5rem;">
                         <div class="form-group">
                             <label for="valorTotalPedido">Valor Total do Pedido</label>
@@ -335,6 +330,48 @@
 
             <div class="modal-actions">
                 <button type="button" onclick="closeInfoModal()" class="secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ETIQUETAS -->
+    <div class="modal-overlay" id="etiquetaModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Gerar Etiquetas NF</h3>
+                <button class="close-modal" onclick="closeEtiquetaModal()">✕</button>
+            </div>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="etiquetaNF">Nota Fiscal *</label>
+                    <input type="text" id="etiquetaNF" required>
+                </div>
+                <div class="form-group">
+                    <label for="etiquetaVolumes">Total de Volumes *</label>
+                    <input type="number" id="etiquetaVolumes" min="1" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="etiquetaDestinatario">Nome do Destinatário *</label>
+                    <input type="text" id="etiquetaDestinatario" required>
+                </div>
+                <div class="form-group">
+                    <label for="etiquetaMunicipio">Município *</label>
+                    <input type="text" id="etiquetaMunicipio" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="etiquetaEndereco">Endereço do Destinatário *</label>
+                    <input type="text" id="etiquetaEndereco" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="etiquetaInfo">Informações Adicionais (Local de Entrega)</label>
+                    <textarea id="etiquetaInfo" rows="2"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="closeEtiquetaModal()" class="secondary">Cancelar</button>
+                <button type="button" onclick="imprimirEtiquetas()">Gerar e Imprimir</button>
             </div>
         </div>
     </div>
