@@ -1,54 +1,54 @@
 /* ============================================
-   VARIÁVEIS BASE (DARK THEME - PADRÃO)
+   VARIÁVEIS BASE (LIGHT THEME - PADRÃO)
    ============================================ */
 :root {
     --primary: #CC7000;
     --primary-light: #E68A00;
     --primary-dark: #B36200;
-    --bg-primary: #000000;
-    --bg-secondary: #000000c7;
-    --bg-card: #1A1A1A;
-    --text-primary: #FFFFFF;
-    --text-secondary: #A0A0A0;
-    --border-color: rgba(204, 112, 0, 0.08);
-    --input-bg: #2A2A2A;
-    --success-color: #22C55E;
-    --success-bg: rgba(34, 197, 94, 0.15);
-    --table-stripe: #1F1F1F;
-    --table-hover: rgba(128, 128, 128, 0.15);
-    --card-shadow: none;
-    --th-bg: #4A4A4A;
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F8F9FA;
+    --bg-card: #FFFFFF;
+    --text-primary: #1F2937;
+    --text-secondary: #6B7280;
+    --border-color: #E5E7EB;
+    --input-bg: #F9FAFB;
+    --success-color: #10B981;
+    --success-bg: rgba(16, 185, 129, 0.1);
+    --warning-color: #F59E0B;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --table-stripe: #F9FAFB;
+    --table-hover: rgba(0, 0, 0, 0.02);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --th-bg: #6B7280;
     --th-color: #FFFFFF;
-    --th-border: #5A5A5A;
-    --status-border: rgba(255, 255, 255, 0.1);
-    --shadow: rgba(0, 0, 0, 0.3);
-    --btn-register: #0077c7;
-    --btn-delete: #e70000;
-    --btn-edit: #777777;
-    --btn-view: #fa7000;
-    --btn-save: #00cc77;
-    --btn-emit: #9333ea;
-    --alert-color: #ef4444;
-    --fab-blue: #0077c7;
+    --th-border: #9CA3AF;
+    --status-border: #E5E7EB;
+    --shadow: rgba(0, 0, 0, 0.1);
+    --btn-register: #3B82F6;
+    --btn-delete: #EF4444;
+    --btn-edit: #6B7280;
+    --btn-view: #F97316;
+    --btn-save: #10B981;
+    --btn-emit: #8B5CF6;
+    --alert-color: #EF4444;
+    --fab-orange: #F97316;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
     :root {
-        --bg-primary: #FFFFFF;
-        --bg-secondary: #F5F5F5;
-        --bg-card: #FFFFFF;
-        --text-primary: #1A1A1A;
-        --text-secondary: #6B7280;
-        --border-color: #E5E7EB;
-        --input-bg: #F9FAFB;
-        --table-stripe: #FAFAFA;
+        --bg-primary: #000000;
+        --bg-secondary: #000000c7;
+        --bg-card: #1A1A1A;
+        --text-primary: #FFFFFF;
+        --text-secondary: #A0A0A0;
+        --border-color: rgba(204, 112, 0, 0.08);
+        --input-bg: #2A2A2A;
+        --table-stripe: #1F1F1F;
         --table-hover: rgba(128, 128, 128, 0.15);
-        --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        --th-bg: #6B7280;
-        --th-color: #FFFFFF;
-        --th-border: #9CA3AF;
-        --status-border: #E5E7EB;
-        --shadow: rgba(0, 0, 0, 0.08);
+        --card-shadow: none;
+        --th-bg: #4A4A4A;
+        --status-border: rgba(255, 255, 255, 0.1);
+        --shadow: rgba(0, 0, 0, 0.3);
     }
 }
 
@@ -149,7 +149,7 @@ h1 {
 }
 
 .btn-new-order-header {
-    background: var(--primary);
+    background: var(--fab-orange);
     color: white;
     border: none;
     padding: 12px 24px;
@@ -162,12 +162,12 @@ h1 {
     gap: 8px;
     transition: all 0.2s ease;
     text-transform: uppercase;
-    box-shadow: 0 2px 8px rgba(204, 112, 0, 0.3);
+    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
 }
 
 .btn-new-order-header:hover {
-    background: var(--primary-light);
-    box-shadow: 0 4px 12px rgba(204, 112, 0, 0.4);
+    background: #EA580C;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
     transform: translateY(-2px);
 }
 
@@ -246,23 +246,24 @@ h1 {
     display: flex;
     align-items: center;
     gap: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .stat-card:hover {
-    border-color: rgba(204, 112, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     transform: translateY(-2px);
 }
 
 .stat-card-success {
-    border-left: 3px solid var(--success-color);
+    border-left: 4px solid var(--success-color);
 }
 
 .stat-card-warning {
-    border-left: 3px solid var(--primary);
+    border-left: 4px solid var(--warning-color);
 }
 
 .stat-card-info {
-    border-left: 3px solid var(--btn-register);
+    border-left: 4px solid var(--btn-register);
 }
 
 .stat-icon {
@@ -276,23 +277,23 @@ h1 {
 }
 
 .stat-icon-default {
-    background: rgba(204, 112, 0, 0.15);
-    color: var(--primary);
+    background: #FEF3C7;
+    color: #F59E0B;
 }
 
 .stat-icon-success {
-    background: rgba(34, 197, 94, 0.15);
-    color: var(--success-color);
+    background: #D1FAE5;
+    color: #10B981;
 }
 
 .stat-icon-warning {
-    background: rgba(204, 112, 0, 0.15);
-    color: var(--primary);
+    background: #FEF3C7;
+    color: #F59E0B;
 }
 
 .stat-icon-info {
-    background: rgba(0, 119, 199, 0.15);
-    color: var(--btn-register);
+    background: #DBEAFE;
+    color: #3B82F6;
 }
 
 .stat-content {
@@ -315,15 +316,15 @@ h1 {
 }
 
 .stat-value-success {
-    color: var(--success-color);
+    color: #10B981;
 }
 
 .stat-value-warning {
-    color: var(--primary);
+    color: #F59E0B;
 }
 
 .stat-value-info {
-    color: var(--btn-register);
+    color: #3B82F6;
 }
 
 /* ============================================
@@ -622,12 +623,12 @@ tbody tr:hover {
 }
 
 tbody tr.row-emitida {
-    background: rgba(34, 197, 94, 0.1) !important;
-    border-left: 3px solid var(--success-color);
+    background: rgba(16, 185, 129, 0.05) !important;
+    border-left: 4px solid #10B981;
 }
 
 tbody tr.row-emitida:hover {
-    background: rgba(34, 197, 94, 0.15) !important;
+    background: rgba(16, 185, 129, 0.1) !important;
 }
 
 .items-table {
@@ -715,22 +716,23 @@ tbody tr.row-emitida:hover {
    ============================================ */
 .badge {
     display: inline-block;
-    padding: 6px 14px;
+    padding: 6px 16px;
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: 600;
+    text-transform: uppercase;
 }
 
 .badge.pendente {
-    background: rgba(204, 112, 0, 0.2);
-    color: var(--primary-light);
-    border: 1px solid rgba(204, 112, 0, 0.3);
+    background: #FEF3C7;
+    color: #92400E;
+    border: none;
 }
 
 .badge.emitida {
-    background: rgba(34, 197, 94, 0.2);
-    color: var(--success-color);
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    background: #D1FAE5;
+    color: #065F46;
+    border: none;
 }
 
 /* ============================================
@@ -769,8 +771,8 @@ tbody tr.row-emitida:hover {
 }
 
 .styled-checkbox:checked + .checkbox-label-styled {
-    background: #22C55E;
-    border-color: #22C55E;
+    background: #10B981;
+    border-color: #10B981;
 }
 
 .styled-checkbox:checked + .checkbox-label-styled::after {
