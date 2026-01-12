@@ -359,7 +359,6 @@ h1 {
     outline: none;
     min-width: 200px;
     padding: 0;
-    text-transform: uppercase;
 }
 
 .search-bar input[type="text"]::placeholder {
@@ -390,7 +389,6 @@ h1 {
     cursor: pointer;
     outline: none;
     transition: all 0.2s ease;
-    text-transform: uppercase;
 }
 
 .filter-dropdown-inline select:hover,
@@ -533,7 +531,6 @@ input[readonly], select[disabled], textarea[readonly] {
     background: var(--bg-card);
     cursor: not-allowed;
     opacity: 0.9;
-    text-transform: uppercase;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -609,7 +606,6 @@ td {
     border-bottom: 1px solid var(--border-color);
     font-size: 0.85rem;
     color: var(--text-primary);
-    text-transform: uppercase;
 }
 
 tbody tr {
@@ -637,12 +633,15 @@ tbody tr.row-emitida:hover {
 .items-table {
     width: 100%;
     margin: 1rem 0;
+    table-layout: fixed;
 }
 
 .items-table th, 
 .items-table td {
-    padding: 10px;
+    padding: 10px 8px;
     border: 1px solid var(--border-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .items-table input, 
@@ -650,11 +649,66 @@ tbody tr.row-emitida:hover {
 .items-table select {
     padding: 8px;
     font-size: 0.85rem;
+    width: 100%;
 }
 
 .items-table textarea {
     min-height: 60px;
+    max-height: 100px;
 }
+
+/* Larguras específicas para cada coluna */
+.items-table th:nth-child(1),
+.items-table td:nth-child(1) { width: 50px; } /* Item */
+
+.items-table th:nth-child(2),
+.items-table td:nth-child(2) { width: 100px; } /* Código */
+
+.items-table th:nth-child(3),
+.items-table td:nth-child(3) { width: 200px; } /* Especificação */
+
+.items-table th:nth-child(4),
+.items-table td:nth-child(4) { width: 70px; } /* UN */
+
+.items-table th:nth-child(5),
+.items-table td:nth-child(5) { width: 80px; } /* Qtd */
+
+.items-table th:nth-child(6),
+.items-table td:nth-child(6) { width: 100px; } /* Valor Un */
+
+.items-table th:nth-child(7),
+.items-table td:nth-child(7) { width: 110px; } /* Valor Total */
+
+.items-table th:nth-child(8),
+.items-table td:nth-child(8) { width: 100px; } /* NCM */
+
+.items-table th:nth-child(9),
+.items-table td:nth-child(9) { width: 50px; } /* Ações */
+
+/* Tabela de visualização (sem coluna de ações) */
+#info-tab-itens .items-table th:nth-child(1),
+#info-tab-itens .items-table td:nth-child(1) { width: 50px; }
+
+#info-tab-itens .items-table th:nth-child(2),
+#info-tab-itens .items-table td:nth-child(2) { width: 110px; }
+
+#info-tab-itens .items-table th:nth-child(3),
+#info-tab-itens .items-table td:nth-child(3) { width: 240px; }
+
+#info-tab-itens .items-table th:nth-child(4),
+#info-tab-itens .items-table td:nth-child(4) { width: 70px; }
+
+#info-tab-itens .items-table th:nth-child(5),
+#info-tab-itens .items-table td:nth-child(5) { width: 90px; }
+
+#info-tab-itens .items-table th:nth-child(6),
+#info-tab-itens .items-table td:nth-child(6) { width: 120px; }
+
+#info-tab-itens .items-table th:nth-child(7),
+#info-tab-itens .items-table td:nth-child(7) { width: 120px; }
+
+#info-tab-itens .items-table th:nth-child(8),
+#info-tab-itens .items-table td:nth-child(8) { width: 100px; }
 
 /* ============================================
    BADGES
@@ -775,8 +829,8 @@ tbody tr.row-emitida:hover {
     background: var(--bg-card);
     border-radius: 16px;
     padding: 2rem;
-    max-width: 95vw;
-    width: 95%;
+    max-width: 1400px;
+    width: 90%;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px var(--shadow);
@@ -1002,8 +1056,8 @@ tbody tr.row-emitida:hover {
 
     .modal-content {
         padding: 1.5rem;
-        width: 100%;
-        max-width: 100%;
+        width: 95%;
+        max-width: 95%;
     }
 
     table {
@@ -1012,6 +1066,12 @@ tbody tr.row-emitida:hover {
 
     th, td {
         padding: 8px 6px;
+    }
+
+    .items-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
     }
 
     .modal-actions {
