@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos de Faturamento</title>
+    <title>Pedido de Faturamento</title>
     <link rel="icon" type="image/png" href="I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -17,7 +17,7 @@
         <div class="container">
             <div class="header">
                 <div class="header-left">
-                    <h1>Pedidos de Faturamento</h1>
+                    <h1>Pedido de Faturamento</h1>
                     <div id="connectionStatus" class="connection-status offline">
                         <span class="status-dot"></span>
                     </div>
@@ -40,7 +40,6 @@
                             <polyline points="14 2 14 8 20 8"></polyline>
                             <line x1="16" y1="13" x2="8" y2="13"></line>
                             <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
                         </svg>
                     </div>
                     <div class="stat-content">
@@ -80,7 +79,7 @@
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-info" id="valorTotal">R$ 0,00</div>
-                        <div class="stat-label">Total</div>
+                        <div class="stat-label">Valor Total</div>
                     </div>
                 </div>
             </div>
@@ -94,40 +93,68 @@
                     </svg>
                     <input type="text" id="search" placeholder="Pesquisar" oninput="filterPedidos()">
                     
-                    <!-- Filters integrated in search bar -->
                     <div class="search-bar-filters">
-                        <div class="filter-dropdown-inline">
-                            <select id="filterVendedor" onchange="filterPedidos()">
-                                <option value="">Responsável</option>
-                            </select>
-                            <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </div>
                         <div class="filter-dropdown-inline">
                             <select id="filterStatus" onchange="filterPedidos()">
                                 <option value="">Todos os Status</option>
                                 <option value="pendente">Pendente</option>
-                                <option value="emitida">Emitida</option>
+                                <option value="emitido">Emitido</option>
                             </select>
                             <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </div>
+                        <div class="month-navigation-inline">
+                            <button onclick="changeMonth(-1)" class="month-nav-arrow" title="Mês anterior">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <div class="month-display-inline">
+                                <span id="currentMonth">Carregando...</span>
+                            </div>
+                            <button onclick="changeMonth(1)" class="month-nav-arrow" title="Próximo mês">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
-                    <button class="calendar-btn" onclick="abrirModalEtiquetas()" title="Gerar Etiquetas">
+                    <button class="calendar-btn" onclick="toggleCalendar()" title="Selecionar mês">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
                     </button>
-                    <button class="calendar-btn" onclick="syncData()" title="Sincronizar" id="btnSync">
+                    <button class="calendar-btn" onclick="syncData()" title="Sincronizar">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="23 4 23 10 17 10"></polyline>
                             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                         </svg>
                     </button>
+                </div>
+            </div>
+
+            <!-- Calendar Modal -->
+            <div class="calendar-modal" id="calendarModal">
+                <div class="calendar-content">
+                    <div class="calendar-header">
+                        <button onclick="changeCalendarYear(-1)" class="calendar-year-nav">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <h3 id="calendarYear">2026</h3>
+                        <button onclick="changeCalendarYear(1)" class="calendar-year-nav">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="calendar-months" id="calendarMonths"></div>
                 </div>
             </div>
 
@@ -141,9 +168,9 @@
                                     <span style="font-size: 1.1rem;">✓</span>
                                 </th>
                                 <th>Nº Pedido</th>
-                                <th>Razão Social</th>
                                 <th>CNPJ</th>
-                                <th>Vendedor</th>
+                                <th>Razão Social</th>
+                                <th>Data</th>
                                 <th>Valor Total</th>
                                 <th>Status</th>
                                 <th style="text-align: center;">Ações</th>
@@ -160,149 +187,190 @@
     <div class="modal-overlay" id="formModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title" id="formTitle">Novo Pedido de Faturamento</h3>
-                <button class="close-modal" onclick="closeFormModal()">✕</button>
+                <h3 class="modal-title" id="modalTitle">Novo Pedido</h3>
+                <button class="close-modal" onclick="closeFormModal()">×</button>
             </div>
             
-            <div class="tabs-container">
-                <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchTab('tab-faturamento')">Faturamento</button>
-                    <button class="tab-btn" onclick="switchTab('tab-itens')">Itens</button>
-                    <button class="tab-btn" onclick="switchTab('tab-entrega')">Entrega</button>
-                    <button class="tab-btn" onclick="switchTab('tab-transporte')">Transporte</button>
-                </div>
+            <form id="pedidoForm">
+                <div class="tabs-container">
+                    <div class="tabs-nav">
+                        <button type="button" class="tab-btn active" onclick="switchTab('tab-geral')">Geral</button>
+                        <button type="button" class="tab-btn" onclick="switchTab('tab-faturamento')">Faturamento</button>
+                        <button type="button" class="tab-btn" onclick="switchTab('tab-contato')">Contato</button>
+                        <button type="button" class="tab-btn" onclick="switchTab('tab-itens')">Itens</button>
+                        <button type="button" class="tab-btn" onclick="switchTab('tab-entrega')">Entrega</button>
+                        <button type="button" class="tab-btn" onclick="switchTab('tab-transporte')">Transporte</button>
+                    </div>
 
-                <!-- TAB FATURAMENTO -->
-                <div class="tab-content active" id="tab-faturamento">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="codigo">Código *</label>
-                            <input type="text" id="codigo" required>
+                    <!-- Aba Geral -->
+                    <div class="tab-content active" id="tab-geral">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Código</label>
+                                <input type="text" id="codigo" readonly style="background: #f5f5f5;">
+                            </div>
+                            <div class="form-group">
+                                <label>Documento</label>
+                                <input type="text" id="documento">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="cnpj">CNPJ *</label>
-                            <input type="text" id="cnpj" required oninput="buscarClientePorCNPJ(this.value)" maxlength="18">
-                            <div id="cnpjSuggestions" class="autocomplete-suggestions"></div>
+                    </div>
+
+                    <!-- Aba Faturamento -->
+                    <div class="tab-content" id="tab-faturamento">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>CNPJ</label>
+                                <input type="text" id="cnpj" oninput="handleCNPJInput(this.value)" list="cnpjSuggestions">
+                                <datalist id="cnpjSuggestions"></datalist>
+                            </div>
+                            <div class="form-group">
+                                <label>Razão Social</label>
+                                <input type="text" id="razao_social">
+                            </div>
+                            <div class="form-group">
+                                <label>Inscrição Estadual</label>
+                                <input type="text" id="inscricao_estadual">
+                            </div>
+                            <div class="form-group">
+                                <label>Endereço</label>
+                                <input type="text" id="endereco">
+                            </div>
+                            <div class="form-group">
+                                <label>Bairro</label>
+                                <input type="text" id="bairro">
+                            </div>
+                            <div class="form-group">
+                                <label>Município</label>
+                                <input type="text" id="municipio">
+                            </div>
+                            <div class="form-group">
+                                <label>UF</label>
+                                <input type="text" id="uf" maxlength="2">
+                            </div>
+                            <div class="form-group">
+                                <label>Número</label>
+                                <input type="text" id="numero">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="razaoSocial">Razão Social *</label>
-                            <input type="text" id="razaoSocial" required>
+                    </div>
+
+                    <!-- Aba Contato -->
+                    <div class="tab-content" id="tab-contato">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Telefone</label>
+                                <input type="text" id="telefone">
+                            </div>
+                            <div class="form-group">
+                                <label>Contato</label>
+                                <input type="text" id="contato">
+                            </div>
+                            <div class="form-group">
+                                <label>E-mail</label>
+                                <input type="email" id="email">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="inscricaoEstadual">Inscrição Estadual</label>
-                            <input type="text" id="inscricaoEstadual">
+                    </div>
+
+                    <!-- Aba Itens -->
+                    <div class="tab-content" id="tab-itens">
+                        <div class="items-section">
+                            <button type="button" onclick="adicionarItem()" class="btn-add-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Adicionar Item
+                            </button>
+                            
+                            <div class="items-table-wrapper">
+                                <table class="items-table" id="itensTable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px;">Item</th>
+                                            <th style="width: 100px;">Estoque</th>
+                                            <th style="min-width: 200px;">Descrição</th>
+                                            <th style="width: 100px;">NCM</th>
+                                            <th style="width: 60px;">UN</th>
+                                            <th style="width: 80px;">QTD</th>
+                                            <th style="width: 120px;">Valor Unit.</th>
+                                            <th style="width: 120px;">Valor Total</th>
+                                            <th style="width: 50px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="itensTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="items-summary">
+                                <div class="summary-grid">
+                                    <div class="summary-item">
+                                        <label>Valor Total:</label>
+                                        <span id="somaValorTotal">R$ 0,00</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <label>Peso (Kg):</label>
+                                        <input type="number" id="peso" step="0.01" min="0">
+                                    </div>
+                                    <div class="summary-item">
+                                        <label>Quantidade Total:</label>
+                                        <input type="number" id="quantidade_total" min="1">
+                                    </div>
+                                    <div class="summary-item">
+                                        <label>Volumes:</label>
+                                        <input type="number" id="volumes" min="1">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label for="endereco">Endereço *</label>
-                            <input type="text" id="endereco" required>
+                    </div>
+
+                    <!-- Aba Entrega -->
+                    <div class="tab-content" id="tab-entrega">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Local de Entrega</label>
+                                <input type="text" id="local_entrega">
+                            </div>
+                            <div class="form-group">
+                                <label>Setor</label>
+                                <input type="text" id="setor">
+                            </div>
+                            <div class="form-group">
+                                <label>Previsão de Entrega</label>
+                                <input type="date" id="previsao_entrega">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="telefone">Telefone</label>
-                            <input type="text" id="telefone" maxlength="15">
-                        </div>
-                        <div class="form-group">
-                            <label for="contato">Contato</label>
-                            <input type="text" id="contato">
-                        </div>
-                        <div class="form-group">
-                            <label for="email">E-mail</label>
-                            <input type="email" id="email">
-                        </div>
-                        <div class="form-group">
-                            <label for="documento">Documento</label>
-                            <input type="text" id="documento">
+                    </div>
+
+                    <!-- Aba Transporte -->
+                    <div class="tab-content" id="tab-transporte">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Transportadora</label>
+                                <input type="text" id="transportadora">
+                            </div>
+                            <div class="form-group">
+                                <label>Frete (R$)</label>
+                                <input type="text" id="frete" oninput="formatMoedaInput(this)">
+                            </div>
+                            <div class="form-group">
+                                <label>Vendedor</label>
+                                <input type="text" id="vendedor">
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- TAB ITENS -->
-                <div class="tab-content" id="tab-itens">
-                    <button type="button" onclick="addItem()" class="btn-add-item" style="margin-bottom: 1rem;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Adicionar Item
-                    </button>
-                    <table class="items-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;">Item</th>
-                                <th style="width: 100px;">Cód. Estoque *</th>
-                                <th style="width: 200px;">Especificação</th>
-                                <th style="width: 70px;">UN *</th>
-                                <th style="width: 80px;">Qtd *</th>
-                                <th style="width: 100px;">Valor Un. (R$)</th>
-                                <th style="width: 110px;">Valor Total</th>
-                                <th style="width: 100px;">NCM</th>
-                                <th style="width: 50px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="itemsContainer"></tbody>
-                    </table>
-                    <div class="form-grid" style="margin-top: 1.5rem;">
-                        <div class="form-group">
-                            <label for="valorTotalPedido">Valor Total do Pedido</label>
-                            <input type="text" id="valorTotalPedido" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="peso">Peso Total (kg)</label>
-                            <input type="text" id="peso">
-                        </div>
-                        <div class="form-group">
-                            <label for="quantidade">Quantidade Total</label>
-                            <input type="text" id="quantidade" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="volumes">Volumes</label>
-                            <input type="text" id="volumes">
-                        </div>
-                    </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="previousTab()" class="secondary" id="btnPrevious" style="display: none;">Anterior</button>
+                    <button type="button" onclick="nextTab()" class="secondary" id="btnNext">Próximo</button>
+                    <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                    <button type="submit" class="success" id="btnSave">Salvar Pedido</button>
                 </div>
-
-                <!-- TAB ENTREGA -->
-                <div class="tab-content" id="tab-entrega">
-                    <div class="form-grid">
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label for="localEntrega">Local de Entrega</label>
-                            <textarea id="localEntrega" rows="3"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="setor">Setor</label>
-                            <input type="text" id="setor">
-                        </div>
-                        <div class="form-group">
-                            <label for="previsaoEntrega">Previsão de Entrega</label>
-                            <input type="date" id="previsaoEntrega">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB TRANSPORTE -->
-                <div class="tab-content" id="tab-transporte">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="transportadora">Transportadora</label>
-                            <input type="text" id="transportadora">
-                        </div>
-                        <div class="form-group">
-                            <label for="valorFrete">Valor do Frete (R$)</label>
-                            <input type="text" id="valorFrete">
-                        </div>
-                        <div class="form-group">
-                            <label for="vendedor">Vendedor *</label>
-                            <input type="text" id="vendedor" required>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
-                <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
-                <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
-                <button type="button" id="btnSave" onclick="savePedido()" style="display: none;">Salvar Pedido</button>
-            </div>
+            </form>
         </div>
     </div>
 
@@ -310,68 +378,52 @@
     <div class="modal-overlay" id="infoModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">Pedido Nº <span id="modalCodigo"></span></h3>
-                <button class="close-modal" onclick="closeInfoModal()">✕</button>
+                <h3 class="modal-title">Pedido Nº <span id="modalNumero"></span></h3>
+                <button class="close-modal" onclick="closeInfoModal()">×</button>
             </div>
             
             <div class="tabs-container">
                 <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-contato')">Contato</button>
                     <button class="tab-btn" onclick="switchInfoTab('info-tab-itens')">Itens</button>
                     <button class="tab-btn" onclick="switchInfoTab('info-tab-entrega')">Entrega</button>
                     <button class="tab-btn" onclick="switchInfoTab('info-tab-transporte')">Transporte</button>
                 </div>
 
-                <div class="tab-content active" id="info-tab-faturamento"></div>
+                <div class="tab-content active" id="info-tab-geral"></div>
+                <div class="tab-content" id="info-tab-faturamento"></div>
+                <div class="tab-content" id="info-tab-contato"></div>
                 <div class="tab-content" id="info-tab-itens"></div>
                 <div class="tab-content" id="info-tab-entrega"></div>
                 <div class="tab-content" id="info-tab-transporte"></div>
             </div>
 
             <div class="modal-actions">
-                <button type="button" onclick="closeInfoModal()" class="secondary">Fechar</button>
+                <button type="button" id="btnInfoPrevious" onclick="previousInfoTab()" class="secondary" style="display: none;">Anterior</button>
+                <button type="button" id="btnInfoNext" onclick="nextInfoTab()" class="secondary">Próximo</button>
+                <button type="button" id="btnInfoClose" onclick="closeInfoModal()" class="secondary">Fechar</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL DE ETIQUETAS -->
+    <!-- MODAL DE ETIQUETA -->
     <div class="modal-overlay" id="etiquetaModal">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h3 class="modal-title">Gerar Etiquetas NF</h3>
-                <button class="close-modal" onclick="closeEtiquetaModal()">✕</button>
+                <h3 class="modal-title">Imprimir Etiqueta</h3>
+                <button class="close-modal" onclick="closeEtiquetaModal()">×</button>
             </div>
             
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="etiquetaNF">Nota Fiscal *</label>
-                    <input type="text" id="etiquetaNF" required>
-                </div>
-                <div class="form-group">
-                    <label for="etiquetaVolumes">Total de Volumes *</label>
-                    <input type="number" id="etiquetaVolumes" min="1" required>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="etiquetaDestinatario">Nome do Destinatário *</label>
-                    <input type="text" id="etiquetaDestinatario" required>
-                </div>
-                <div class="form-group">
-                    <label for="etiquetaMunicipio">Município *</label>
-                    <input type="text" id="etiquetaMunicipio" required>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="etiquetaEndereco">Endereço do Destinatário *</label>
-                    <input type="text" id="etiquetaEndereco" required>
-                </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="etiquetaInfo">Informações Adicionais (Local de Entrega)</label>
-                    <textarea id="etiquetaInfo" rows="2"></textarea>
-                </div>
+            <div class="form-group">
+                <label>Número da Nota Fiscal *</label>
+                <input type="text" id="numeroNotaFiscal" placeholder="Digite o número da nota fiscal">
             </div>
 
             <div class="modal-actions">
                 <button type="button" onclick="closeEtiquetaModal()" class="secondary">Cancelar</button>
-                <button type="button" onclick="imprimirEtiquetas()">Gerar e Imprimir</button>
+                <button type="button" onclick="imprimirEtiqueta()" class="success">Imprimir</button>
             </div>
         </div>
     </div>
