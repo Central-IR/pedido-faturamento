@@ -1,26 +1,28 @@
 // ============================================
 // CONFIGURAÇÃO
 // ============================================
-const SUPABASE_URL = 'SUA_URL_SUPABASE';
-const SUPABASE_KEY = 'SUA_CHAVE_SUPABASE';
+const PORTAL_URL = 'https://ir-comercio-portal-zcan.onrender.com';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3004/api'
+    : `${window.location.origin}/api`;
 
 let pedidos = [];
-let estoque = [];
 let isOnline = false;
 let itemCounter = 0;
 let clientesCache = {};
+let estoqueCache = {};
 let editingId = null;
+let sessionToken = null;
 let currentTabIndex = 0;
-let selectedMonth = new Date().getMonth();
-let selectedYear = new Date().getFullYear();
-let etiquetaPedidoId = null;
-
-const tabs = ['tab-geral', 'tab-faturamento', 'tab-contato', 'tab-itens', 'tab-entrega', 'tab-transporte'];
-const infoTabs = ['info-tab-geral', 'info-tab-faturamento', 'info-tab-contato', 'info-tab-itens', 'info-tab-entrega', 'info-tab-transporte'];
+const tabs = ['tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
 // ============================================
 // FUNÇÕES AUXILIARES
 // ============================================
+function toUpperCase(value) {
+    return value ? String(value).toUpperCase() : '';
+}
+
 function formatarCNPJ(cnpj) {
     cnpj = cnpj.replace(/\D/g, '');
     if (cnpj.length <= 14) {
@@ -40,47 +42,86 @@ function parseMoeda(valor) {
     return parseFloat(valor.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
-function formatMoedaInput(input) {
-    let valor = input.value.replace(/\D/g, '');
-    if (valor) {
-        valor = (parseInt(valor) / 100).toFixed(2);
-        input.value = formatarMoeda(valor);
-    }
-}
-
 function showMessage(message, type = 'success') {
     const div = document.createElement('div');
     div.className = `floating-message ${type}`;
     div.textContent = message;
     document.body.appendChild(div);
     setTimeout(() => {
-        div.style.animation = 'slideOutBottom 0.3s ease forwards';
+        div.style.animation = 'slideOut 0.3s ease forwards';
         setTimeout(() => div.remove(), 300);
     }, 3000);
 }
 
 // ============================================
-// INICIALIZAÇÃO
+// INICIALIZAÇÃO E AUTENTICAÇÃO
 // ============================================
-document.addEventListener('DOMContentLoaded', async () => {
-    await inicializarApp();
-    
-    // Event listener para formulário
-    const form = document.getElementById('pedidoForm');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await savePedido();
-        });
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    verificarAutenticacao();
 });
+
+function verificarAutenticacao() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('sessionToken');
+
+    if (tokenFromUrl) {
+        sessionToken = tokenFromUrl;
+        sessionStorage.setItem('pedidosSession', tokenFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        sessionToken = sessionStorage.getItem('pedidosSession');
+    }
+
+    if (!sessionToken) {
+        mostrarTelaAcessoNegado();
+        return;
+    }
+
+    inicializarApp();
+}
+
+function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
+    document.body.innerHTML = `
+        <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            text-align: center;
+            padding: 2rem;
+        ">
+            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">
+                ${mensagem}
+            </h1>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                Somente usuários autenticados podem acessar esta área.
+            </p>
+            <a href="${PORTAL_URL}" style="
+                display: inline-block;
+                background: var(--btn-register);
+                color: white;
+                padding: 14px 32px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: 600;
+                text-transform: uppercase;
+            ">IR PARA O PORTAL</a>
+        </div>
+    `;
+}
 
 async function inicializarApp() {
     await checkConnection();
     await loadPedidos();
     await loadEstoque();
-    updateMonthDisplay();
-    renderCalendar();
+    
+    // Formatar CNPJ
+    document.getElementById('cnpj')?.addEventListener('input', (e) => {
+        e.target.value = formatarCNPJ(e.target.value);
+    });
     
     setInterval(checkConnection, 15000);
     setInterval(() => {
@@ -92,30 +133,43 @@ async function inicializarApp() {
 }
 
 // ============================================
-// CONEXÃO
+// CONEXÃO COM A API
 // ============================================
 async function checkConnection() {
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/pedido_faturamento`, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(`${API_URL}/pedidos`, {
             method: 'HEAD',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+            headers: { 'X-Session-Token': sessionToken },
+            signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return false;
+        }
+
         const wasOffline = !isOnline;
         isOnline = response.ok;
         
         if (wasOffline && isOnline) {
             console.log('✅ Servidor ONLINE');
             await loadPedidos();
-            await loadEstoque();
+        } else if (!wasOffline && !isOnline) {
+            console.log('❌ Servidor OFFLINE');
         }
         
         updateConnectionStatus();
         return isOnline;
     } catch (error) {
+        if (isOnline) {
+            console.log('❌ Erro de conexão:', error.message);
+        }
         isOnline = false;
         updateConnectionStatus();
         return false;
@@ -135,32 +189,45 @@ async function syncData() {
         return;
     }
     
+    const btnSync = document.getElementById('btnSync');
+    if (btnSync) {
+        btnSync.disabled = true;
+        btnSync.style.opacity = '0.5';
+    }
+    
     try {
         await loadPedidos();
         await loadEstoque();
-        showMessage('Dados sincronizados', 'success');
+        showMessage('Dados sincronizados com sucesso!', 'success');
     } catch (error) {
-        showMessage('Erro ao sincronizar', 'error');
+        showMessage('Erro ao sincronizar dados!', 'error');
+    } finally {
+        if (btnSync) {
+            btnSync.disabled = false;
+            btnSync.style.opacity = '1';
+        }
     }
 }
 
 // ============================================
-// CARREGAR DADOS
+// CARREGAR PEDIDOS
 // ============================================
 async function loadPedidos() {
     if (!isOnline) return;
-    
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/pedido_faturamento?select=*&order=codigo.desc`, {
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+        const response = await fetch(`${API_URL}/pedidos`, {
+            headers: { 'X-Session-Token': sessionToken }
         });
+
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
 
         if (response.ok) {
             pedidos = await response.json();
-            atualizarCacheClientes();
+            atualizarCacheClientes(pedidos);
             updateDisplay();
         }
     } catch (error) {
@@ -168,20 +235,29 @@ async function loadPedidos() {
     }
 }
 
+// ============================================
+// CARREGAR ESTOQUE
+// ============================================
 async function loadEstoque() {
-    if (!isOnline) return;
-    
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/estoque?select=*`, {
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+        const response = await fetch(`${API_URL}/estoque`, {
+            headers: { 'X-Session-Token': sessionToken }
         });
 
+        if (response.status === 401) {
+            sessionStorage.removeItem('pedidosSession');
+            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
+            return;
+        }
+
         if (response.ok) {
-            estoque = await response.json();
-            console.log(`📦 ${estoque.length} itens carregados do estoque`);
+            const items = await response.json();
+            estoqueCache = {};
+            items.forEach(item => {
+                // APENAS pelo código do estoque
+                estoqueCache[item.codigo.toString()] = item;
+            });
+            console.log(`📦 ${items.length} itens carregados do estoque`);
         }
     } catch (error) {
         console.error('Erro ao carregar estoque:', error);
@@ -191,7 +267,7 @@ async function loadEstoque() {
 // ============================================
 // CACHE DE CLIENTES
 // ============================================
-function atualizarCacheClientes() {
+function atualizarCacheClientes(pedidos) {
     clientesCache = {};
     pedidos.forEach(pedido => {
         const cnpj = pedido.cnpj?.trim();
@@ -200,480 +276,361 @@ function atualizarCacheClientes() {
                 razaoSocial: pedido.razao_social,
                 inscricaoEstadual: pedido.inscricao_estadual,
                 endereco: pedido.endereco,
-                bairro: pedido.bairro,
-                municipio: pedido.municipio,
-                uf: pedido.uf,
-                numero: pedido.numero,
                 telefone: pedido.telefone,
                 contato: pedido.contato,
-                email: pedido.email,
+                email: pedido.email || '',
+                documento: pedido.documento,
                 localEntrega: pedido.local_entrega,
                 setor: pedido.setor,
                 transportadora: pedido.transportadora,
-                frete: pedido.frete,
-                vendedor: pedido.vendedor
+                valorFrete: pedido.valor_frete,
+                vendedor: pedido.vendedor,
+                peso: pedido.peso,
+                quantidade: pedido.quantidade,
+                volumes: pedido.volumes,
+                previsaoEntrega: pedido.previsao_entrega
             };
         }
     });
     console.log(`👥 ${Object.keys(clientesCache).length} clientes em cache`);
 }
 
-function handleCNPJInput(cnpj) {
-    const cnpjFormatado = formatarCNPJ(cnpj);
-    document.getElementById('cnpj').value = cnpjFormatado;
+function buscarClientePorCNPJ(cnpj) {
+    cnpj = cnpj.replace(/\D/g, '');
     
-    const cnpjLimpo = cnpj.replace(/\D/g, '');
-    const datalist = document.getElementById('cnpjSuggestions');
-    datalist.innerHTML = '';
+    const suggestionsDiv = document.getElementById('cnpjSuggestions');
+    if (!suggestionsDiv) return;
     
-    // Buscar CNPJs similares
-    const cnpjsSimilares = Object.keys(clientesCache).filter(c => 
-        c.includes(cnpjLimpo)
+    if (cnpj.length < 3) {
+        suggestionsDiv.innerHTML = '';
+        suggestionsDiv.style.display = 'none';
+        return;
+    }
+    
+    const matches = Object.keys(clientesCache).filter(key => 
+        key.replace(/\D/g, '').includes(cnpj)
     );
     
-    cnpjsSimilares.forEach(cnpjCache => {
-        const option = document.createElement('option');
-        option.value = formatarCNPJ(cnpjCache);
-        option.textContent = `${formatarCNPJ(cnpjCache)} - ${clientesCache[cnpjCache].razaoSocial}`;
-        datalist.appendChild(option);
+    if (matches.length === 0) {
+        suggestionsDiv.innerHTML = '';
+        suggestionsDiv.style.display = 'none';
+        return;
+    }
+    
+    suggestionsDiv.innerHTML = '';
+    matches.forEach(cnpjKey => {
+        const cliente = clientesCache[cnpjKey];
+        const div = document.createElement('div');
+        div.className = 'autocomplete-item';
+        div.innerHTML = `<strong>${formatarCNPJ(cnpjKey)}</strong><br>${cliente.razaoSocial}`;
+        div.onclick = () => preencherDadosClienteCompleto(cnpjKey);
+        suggestionsDiv.appendChild(div);
     });
     
-    // Se CNPJ existe no cache, preencher dados
-    if (clientesCache[cnpjLimpo]) {
-        preencherDadosCliente(cnpjLimpo);
+    suggestionsDiv.style.display = 'block';
+}
+
+function preencherDadosClienteCompleto(cnpj) {
+    // Buscar o último pedido com este CNPJ
+    const pedidosComCNPJ = pedidos.filter(p => p.cnpj === cnpj);
+    
+    if (pedidosComCNPJ.length === 0) {
+        // Se não houver pedidos, usar cache básico
+        preencherDadosCliente(cnpj);
+        return;
     }
+    
+    // Pegar o último pedido (mais recente)
+    const ultimoPedido = pedidosComCNPJ.sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+    )[0];
+    
+    // Preencher TODOS os dados de todas as abas
+    document.getElementById('cnpj').value = formatarCNPJ(cnpj);
+    document.getElementById('razaoSocial').value = ultimoPedido.razao_social || '';
+    document.getElementById('inscricaoEstadual').value = ultimoPedido.inscricao_estadual || '';
+    document.getElementById('endereco').value = ultimoPedido.endereco || '';
+    document.getElementById('telefone').value = ultimoPedido.telefone || '';
+    document.getElementById('contato').value = ultimoPedido.contato || '';
+    document.getElementById('email').value = ultimoPedido.email || '';
+    document.getElementById('documento').value = ultimoPedido.documento || '';
+    
+    // Aba Entrega
+    document.getElementById('localEntrega').value = ultimoPedido.local_entrega || '';
+    document.getElementById('setor').value = ultimoPedido.setor || '';
+    if (ultimoPedido.previsao_entrega) {
+        document.getElementById('previsaoEntrega').value = ultimoPedido.previsao_entrega;
+    }
+    
+    // Aba Transporte
+    document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
+    document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
+    document.getElementById('vendedor').value = ultimoPedido.vendedor || '';
+    document.getElementById('peso').value = ultimoPedido.peso || '';
+    document.getElementById('volumes').value = ultimoPedido.volumes || '';
+    
+    document.getElementById('cnpjSuggestions').style.display = 'none';
+    showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
 }
 
 function preencherDadosCliente(cnpj) {
     const cliente = clientesCache[cnpj];
     if (!cliente) return;
     
-    document.getElementById('razao_social').value = cliente.razaoSocial || '';
-    document.getElementById('inscricao_estadual').value = cliente.inscricaoEstadual || '';
-    document.getElementById('endereco').value = cliente.endereco || '';
-    document.getElementById('bairro').value = cliente.bairro || '';
-    document.getElementById('municipio').value = cliente.municipio || '';
-    document.getElementById('uf').value = cliente.uf || '';
-    document.getElementById('numero').value = cliente.numero || '';
+    document.getElementById('cnpj').value = formatarCNPJ(cnpj);
+    document.getElementById('razaoSocial').value = cliente.razaoSocial;
+    document.getElementById('inscricaoEstadual').value = cliente.inscricaoEstadual || '';
+    document.getElementById('endereco').value = cliente.endereco;
     document.getElementById('telefone').value = cliente.telefone || '';
     document.getElementById('contato').value = cliente.contato || '';
     document.getElementById('email').value = cliente.email || '';
-    document.getElementById('local_entrega').value = cliente.localEntrega || '';
+    document.getElementById('documento').value = cliente.documento || '';
+    document.getElementById('localEntrega').value = cliente.localEntrega || '';
     document.getElementById('setor').value = cliente.setor || '';
     document.getElementById('transportadora').value = cliente.transportadora || '';
-    document.getElementById('frete').value = cliente.frete || '';
+    document.getElementById('valorFrete').value = cliente.valorFrete || '';
     document.getElementById('vendedor').value = cliente.vendedor || '';
+    document.getElementById('peso').value = cliente.peso || '';
+    document.getElementById('volumes').value = cliente.volumes || '';
+    if (cliente.previsaoEntrega) {
+        document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
+    }
+    
+    document.getElementById('cnpjSuggestions').style.display = 'none';
+    showMessage('Dados do cliente preenchidos automaticamente!', 'success');
 }
 
 // ============================================
 // ATUALIZAR DISPLAY
 // ============================================
 function updateDisplay() {
-    updateDashboard();
-    renderPedidos();
-}
-
-function updateDashboard() {
-    const filteredPedidos = getFilteredPedidos();
+    const totalEmitidos = pedidos.filter(p => p.status === 'emitida').length;
+    const totalPendentes = pedidos.filter(p => p.status === 'pendente').length;
     
-    const totalPedidos = filteredPedidos.length;
-    const totalEmitidos = filteredPedidos.filter(p => p.status === 'emitido').length;
-    const totalPendentes = filteredPedidos.filter(p => p.status === 'pendente' || !p.status).length;
-    
-    const valorTotal = filteredPedidos.reduce((sum, p) => {
-        const itens = typeof p.itens === 'string' ? JSON.parse(p.itens || '[]') : (p.itens || []);
-        const total = itens.reduce((s, item) => s + (parseFloat(item.valor_total) || 0), 0);
-        return sum + total;
+    // Calcular valor total
+    const valorTotalGeral = pedidos.reduce((acc, p) => {
+        const valor = parseMoeda(p.valor_total);
+        return acc + valor;
     }, 0);
     
-    document.getElementById('totalPedidos').textContent = totalPedidos;
+    document.getElementById('totalPedidos').textContent = pedidos.length;
     document.getElementById('totalEmitidos').textContent = totalEmitidos;
     document.getElementById('totalPendentes').textContent = totalPendentes;
-    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotal);
+    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotalGeral);
+    
+    updateVendedoresFilter();
+    updateTable();
 }
 
-function getFilteredPedidos() {
-    return pedidos.filter(pedido => {
-        const data = new Date(pedido.created_at || pedido.timestamp);
-        const month = data.getMonth();
-        const year = data.getFullYear();
-        return month === selectedMonth && year === selectedYear;
+// ============================================
+// ATUALIZAR FILTRO DE VENDEDORES
+// ============================================
+function updateVendedoresFilter() {
+    const vendedores = new Set();
+    pedidos.forEach(p => {
+        if (p.vendedor?.trim()) {
+            vendedores.add(p.vendedor.trim());
+        }
     });
+
+    const select = document.getElementById('filterVendedor');
+    if (select) {
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Responsável</option>';
+        Array.from(vendedores).sort().forEach(v => {
+            const option = document.createElement('option');
+            option.value = v;
+            option.textContent = v;
+            select.appendChild(option);
+        });
+        select.value = currentValue;
+    }
 }
 
-function renderPedidos() {
+// ============================================
+// FILTRAR PEDIDOS
+// ============================================
+function filterPedidos() {
+    updateTable();
+}
+
+// ============================================
+// ATUALIZAR TABELA
+// ============================================
+function updateTable() {
     const container = document.getElementById('pedidosContainer');
-    if (!container) return;
+    let filtered = [...pedidos];
     
-    let filteredPedidos = getFilteredPedidos();
+    const search = document.getElementById('search').value.toLowerCase();
+    const filterVendedor = document.getElementById('filterVendedor').value;
+    const filterStatus = document.getElementById('filterStatus').value;
     
-    // Aplicar filtros
-    const searchTerm = document.getElementById('search')?.value.toLowerCase() || '';
-    const statusFilter = document.getElementById('filterStatus')?.value || '';
-    
-    if (searchTerm) {
-        filteredPedidos = filteredPedidos.filter(p =>
-            p.codigo?.toString().includes(searchTerm) ||
-            p.cnpj?.toLowerCase().includes(searchTerm) ||
-            p.razao_social?.toLowerCase().includes(searchTerm)
+    if (search) {
+        filtered = filtered.filter(p => 
+            p.codigo?.toString().includes(search) ||
+            (p.cnpj || '').toLowerCase().includes(search) ||
+            (p.razao_social || '').toLowerCase().includes(search)
         );
     }
     
-    if (statusFilter) {
-        filteredPedidos = filteredPedidos.filter(p => 
-            (p.status || 'pendente') === statusFilter
-        );
+    if (filterVendedor) {
+        filtered = filtered.filter(p => (p.vendedor || '') === filterVendedor);
     }
     
-    if (filteredPedidos.length === 0) {
+    if (filterStatus) {
+        filtered = filtered.filter(p => p.status === filterStatus);
+    }
+    
+    if (filtered.length === 0) {
         container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado</td></tr>';
         return;
     }
     
-    container.innerHTML = filteredPedidos.map(pedido => {
-        const itens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens || '[]') : (pedido.itens || []);
-        const valorTotal = itens.reduce((sum, item) => sum + (parseFloat(item.valor_total) || 0), 0);
-        const data = new Date(pedido.created_at || pedido.timestamp);
-        const status = pedido.status || 'pendente';
-        
-        return `
-            <tr>
-                <td style="text-align: center;">
-                    <input type="checkbox" data-id="${pedido.id}">
-                </td>
-                <td>${pedido.codigo || '-'}</td>
-                <td>${pedido.cnpj ? formatarCNPJ(pedido.cnpj) : '-'}</td>
-                <td>${pedido.razao_social || '-'}</td>
-                <td>${data.toLocaleDateString('pt-BR')}</td>
-                <td>${formatarMoeda(valorTotal)}</td>
-                <td>
-                    <span class="status-badge status-${status}">
-                        ${status === 'emitido' ? 'Emitido' : 'Pendente'}
-                    </span>
-                </td>
-                <td class="actions-cell" style="text-align: center;">
-                    <button onclick="viewPedido('${pedido.id}')" class="action-btn view" title="Visualizar">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="16" x2="12" y2="12"></line>
-                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                        </svg>
+    container.innerHTML = filtered.map(pedido => `
+        <tr class="${pedido.status === 'emitida' ? 'row-fechada' : ''}">
+            <td style="text-align: center;">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" 
+                           class="styled-checkbox" 
+                           id="check-${pedido.id}"
+                           ${pedido.status === 'emitida' ? 'checked' : ''}
+                           onchange="toggleEmissao(${pedido.id}, this.checked)">
+                    <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
+                </div>
+            </td>
+            <td><strong>${pedido.codigo}</strong></td>
+            <td>${pedido.razao_social}</td>
+            <td>${formatarCNPJ(pedido.cnpj)}</td>
+            <td>${pedido.vendedor || '-'}</td>
+            <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
+            <td>
+                <span class="badge ${pedido.status === 'emitida' ? 'fechada' : 'aberta'}">
+                    ${pedido.status === 'emitida' ? 'Fechada' : 'Aberta'}
+                </span>
+            </td>
+            <td>
+                <div class="actions">
+                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: #F59E0B;">
+                        Ver
                     </button>
-                    <button onclick="editPedido('${pedido.id}')" class="action-btn edit" title="Editar">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
+                    <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: #6B7280;">
+                        Editar
                     </button>
-                    <button onclick="openEtiquetaModal('${pedido.id}')" class="action-btn success" title="Imprimir Etiqueta">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                            <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
-                            <line x1="12" y1="22" x2="12" y2="12"></line>
-                        </svg>
+                    <button onclick="deletePedido(${pedido.id})" class="action-btn" style="background: #EF4444;">
+                        Excluir
                     </button>
-                    <button onclick="deletePedido('${pedido.id}')" class="action-btn delete" title="Excluir">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function filterPedidos() {
-    renderPedidos();
+                </div>
+            </td>
+        </tr>
+    `).join('');
 }
 
 // ============================================
-// MODAL DE FORMULÁRIO
+// NAVEGAÇÃO ENTRE ABAS
 // ============================================
-function openFormModal() {
-    editingId = null;
-    currentTabIndex = 0;
-    itemCounter = 0;
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     
-    document.getElementById('modalTitle').textContent = 'Novo Pedido';
-    document.getElementById('pedidoForm').reset();
-    document.getElementById('codigo').value = 'Gerado automaticamente';
-    document.getElementById('itensTableBody').innerHTML = '';
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
     
-    // Adicionar primeiro item
-    adicionarItem();
+    currentTabIndex = tabs.indexOf(tabId);
+    updateNavigationButtons();
+}
+
+function nextTab() {
+    if (currentTabIndex < tabs.length - 1) {
+        currentTabIndex++;
+        activateTab(currentTabIndex);
+    }
+}
+
+function previousTab() {
+    if (currentTabIndex > 0) {
+        currentTabIndex--;
+        activateTab(currentTabIndex);
+    }
+}
+
+function activateTab(index) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     
-    // Resetar abas
-    tabs.forEach((tabId, index) => {
-        document.getElementById(tabId).classList.toggle('active', index === 0);
-        document.querySelectorAll('.tab-btn')[index].classList.toggle('active', index === 0);
-    });
+    const tabId = tabs[index];
+    document.getElementById(tabId).classList.add('active');
+    document.querySelectorAll('.tab-btn')[index].classList.add('active');
     
     updateNavigationButtons();
-    document.getElementById('formModal').classList.add('show');
 }
 
-function closeFormModal() {
-    if (confirm('Deseja cancelar? Os dados não salvos serão perdidos.')) {
-        document.getElementById('formModal').classList.remove('show');
-        showMessage('Pedido cancelado', 'error');
-    }
-}
-
-function editPedido(id) {
-    const pedido = pedidos.find(p => p.id === id);
-    if (!pedido) return;
+function updateNavigationButtons() {
+    const btnPrevious = document.getElementById('btnPrevious');
+    const btnNext = document.getElementById('btnNext');
+    const btnSave = document.getElementById('btnSave');
     
-    editingId = id;
-    currentTabIndex = 0;
-    
-    document.getElementById('modalTitle').textContent = `Editar Pedido Nº ${pedido.codigo}`;
-    document.getElementById('codigo').value = pedido.codigo || 'Gerado automaticamente';
-    document.getElementById('documento').value = pedido.documento || '';
-    document.getElementById('cnpj').value = pedido.cnpj ? formatarCNPJ(pedido.cnpj) : '';
-    document.getElementById('razao_social').value = pedido.razao_social || '';
-    document.getElementById('inscricao_estadual').value = pedido.inscricao_estadual || '';
-    document.getElementById('endereco').value = pedido.endereco || '';
-    document.getElementById('bairro').value = pedido.bairro || '';
-    document.getElementById('municipio').value = pedido.municipio || '';
-    document.getElementById('uf').value = pedido.uf || '';
-    document.getElementById('numero').value = pedido.numero || '';
-    document.getElementById('telefone').value = pedido.telefone || '';
-    document.getElementById('contato').value = pedido.contato || '';
-    document.getElementById('email').value = pedido.email || '';
-    document.getElementById('peso').value = pedido.peso || '';
-    document.getElementById('quantidade_total').value = pedido.quantidade_total || '';
-    document.getElementById('volumes').value = pedido.volumes || '';
-    document.getElementById('local_entrega').value = pedido.local_entrega || '';
-    document.getElementById('setor').value = pedido.setor || '';
-    document.getElementById('previsao_entrega').value = pedido.previsao_entrega || '';
-    document.getElementById('transportadora').value = pedido.transportadora || '';
-    document.getElementById('frete').value = pedido.frete ? formatarMoeda(pedido.frete) : '';
-    document.getElementById('vendedor').value = pedido.vendedor || '';
-    
-    // Carregar itens
-    const itens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens || '[]') : (pedido.itens || []);
-    document.getElementById('itensTableBody').innerHTML = '';
-    itemCounter = 0;
-    
-    if (itens.length > 0) {
-        itens.forEach(item => {
-            adicionarItem(item);
-        });
-    } else {
-        adicionarItem();
-    }
-    
-    // Resetar abas
-    tabs.forEach((tabId, index) => {
-        document.getElementById(tabId).classList.toggle('active', index === 0);
-        document.querySelectorAll('.tab-btn')[index].classList.toggle('active', index === 0);
-    });
-    
-    updateNavigationButtons();
-    document.getElementById('formModal').classList.add('show');
-}
-
-async function savePedido() {
-    // Coletar dados do formulário
-    const itens = [];
-    
-    document.querySelectorAll('[id^="item-"]').forEach((row, index) => {
-        const id = row.id.replace('item-', '');
-        const codigoEstoque = document.getElementById(`codigoEstoque-${id}`)?.value || '';
-        const especificacao = document.getElementById(`especificacao-${id}`)?.value || '';
-        const ncm = document.getElementById(`ncm-${id}`)?.value || '';
-        const unidade = document.getElementById(`unidade-${id}`)?.value || '';
-        const quantidade = document.getElementById(`quantidade-${id}`)?.value || '';
-        const valorUnitario = document.getElementById(`valorUnitario-${id}`)?.value || '';
-        const valorTotal = document.getElementById(`valorTotal-${id}`)?.value || '';
-        
-        if (codigoEstoque && quantidade) {
-            itens.push({
-                item: index + 1,
-                estoque: codigoEstoque,
-                descricao: especificacao,
-                ncm: ncm,
-                un: unidade,
-                qtd: quantidade,
-                valor_unitario: valorUnitario,
-                valor_total: valorTotal
-            });
-        }
-    });
-    
-    const pedidoData = {
-        documento: document.getElementById('documento').value,
-        cnpj: document.getElementById('cnpj').value.replace(/\D/g, ''),
-        razao_social: document.getElementById('razao_social').value,
-        inscricao_estadual: document.getElementById('inscricao_estadual').value,
-        endereco: document.getElementById('endereco').value,
-        bairro: document.getElementById('bairro').value,
-        municipio: document.getElementById('municipio').value,
-        uf: document.getElementById('uf').value,
-        numero: document.getElementById('numero').value,
-        telefone: document.getElementById('telefone').value,
-        contato: document.getElementById('contato').value,
-        email: document.getElementById('email').value,
-        itens: JSON.stringify(itens),
-        peso: parseFloat(document.getElementById('peso').value) || 0,
-        quantidade_total: parseInt(document.getElementById('quantidade_total').value) || 0,
-        volumes: parseInt(document.getElementById('volumes').value) || 0,
-        local_entrega: document.getElementById('local_entrega').value,
-        setor: document.getElementById('setor').value,
-        previsao_entrega: document.getElementById('previsao_entrega').value,
-        transportadora: document.getElementById('transportadora').value,
-        frete: parseMoeda(document.getElementById('frete').value),
-        vendedor: document.getElementById('vendedor').value,
-        status: 'pendente'
-    };
-    
-    try {
-        let response;
-        
-        if (editingId) {
-            // Atualizar pedido existente
-            response = await fetch(`${SUPABASE_URL}/rest/v1/pedido_faturamento?id=eq.${editingId}`, {
-                method: 'PATCH',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=representation'
-                },
-                body: JSON.stringify(pedidoData)
-            });
-            
-            if (response.ok) {
-                const updatedPedido = await response.json();
-                showMessage(`Pedido ${updatedPedido[0].codigo} atualizado`, 'success');
-            }
-        } else {
-            // Criar novo pedido
-            // Gerar código
-            const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => p.codigo || 0)) : 0;
-            pedidoData.codigo = maxCodigo + 1;
-            
-            response = await fetch(`${SUPABASE_URL}/rest/v1/pedido_faturamento`, {
-                method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=representation'
-                },
-                body: JSON.stringify(pedidoData)
-            });
-            
-            if (response.ok) {
-                const newPedido = await response.json();
-                showMessage(`Pedido ${newPedido[0].codigo} registrado`, 'success');
-            }
-        }
-        
-        if (response.ok) {
-            await loadPedidos();
-            document.getElementById('formModal').classList.remove('show');
-        } else {
-            showMessage('Erro ao salvar pedido', 'error');
-        }
-    } catch (error) {
-        console.error('Erro ao salvar pedido:', error);
-        showMessage('Erro ao salvar pedido', 'error');
-    }
-}
-
-async function deletePedido(id) {
-    const pedido = pedidos.find(p => p.id === id);
-    if (!pedido) return;
-    
-    if (!confirm(`Deseja realmente excluir o pedido ${pedido.codigo}?`)) return;
-    
-    try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/pedido_faturamento?id=eq.${id}`, {
-            method: 'DELETE',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
-        });
-        
-        if (response.ok) {
-            showMessage(`Pedido ${pedido.codigo} excluído`, 'error');
-            await loadPedidos();
-        } else {
-            showMessage('Erro ao excluir pedido', 'error');
-        }
-    } catch (error) {
-        console.error('Erro ao excluir pedido:', error);
-        showMessage('Erro ao excluir pedido', 'error');
-    }
+    btnPrevious.style.display = currentTabIndex === 0 ? 'none' : 'inline-block';
+    btnNext.style.display = currentTabIndex === tabs.length - 1 ? 'none' : 'inline-block';
+    btnSave.style.display = currentTabIndex === tabs.length - 1 ? 'inline-block' : 'none';
 }
 
 // ============================================
-// GESTÃO DE ITENS
+// GERENCIAMENTO DE ITENS
 // ============================================
-function adicionarItem(itemData = null) {
+function addItem() {
     itemCounter++;
-    const tbody = document.getElementById('itensTableBody');
-    const row = tbody.insertRow();
-    
-    row.id = `item-${itemCounter}`;
-    row.innerHTML = `
-        <td><input type="text" value="${itemData?.item || itemCounter}" readonly style="width: 50px; text-align: center; background: #f5f5f5;"></td>
+    const container = document.getElementById('itemsContainer');
+    const tr = document.createElement('tr');
+    tr.id = `item-${itemCounter}`;
+    tr.innerHTML = `
+        <td><input type="text" value="${itemCounter}" readonly style="text-align: center; width: 50px;"></td>
         <td>
             <input type="text" 
                    id="codigoEstoque-${itemCounter}" 
                    class="codigo-estoque"
-                   value="${itemData?.estoque || ''}"
                    placeholder="CÓDIGO"
                    onblur="verificarEstoque(${itemCounter})"
-                   onchange="buscarDadosEstoque(${itemCounter})">
+                   onchange="buscarDadosEstoque(${itemCounter})"
+                   required>
             <div id="estoque-warning-${itemCounter}" style="color: var(--alert-color); font-size: 0.75rem; margin-top: 4px; display: none;"></div>
         </td>
-        <td><textarea id="especificacao-${itemCounter}" rows="2" style="min-width: 180px;">${itemData?.descricao || ''}</textarea></td>
-        <td><input type="text" id="ncm-${itemCounter}" value="${itemData?.ncm || ''}" readonly style="background: #f5f5f5;"></td>
+        <td><textarea id="especificacao-${itemCounter}" rows="2"></textarea></td>
         <td>
-            <select id="unidade-${itemCounter}" style="width: 60px;" required>
+            <select id="unidade-${itemCounter}" required>
                 <option value="">-</option>
-                <option value="UN" ${itemData?.un === 'UN' ? 'selected' : ''}>UN</option>
-                <option value="MT" ${itemData?.un === 'MT' ? 'selected' : ''}>MT</option>
-                <option value="KG" ${itemData?.un === 'KG' ? 'selected' : ''}>KG</option>
-                <option value="PC" ${itemData?.un === 'PC' ? 'selected' : ''}>PC</option>
-                <option value="CX" ${itemData?.un === 'CX' ? 'selected' : ''}>CX</option>
-                <option value="LT" ${itemData?.un === 'LT' ? 'selected' : ''}>LT</option>
+                <option value="UN">UN</option>
+                <option value="MT">MT</option>
+                <option value="KG">KG</option>
+                <option value="PC">PC</option>
+                <option value="CX">CX</option>
+                <option value="LT">LT</option>
             </select>
         </td>
         <td>
             <input type="number" 
                    id="quantidade-${itemCounter}" 
-                   value="${itemData?.qtd || ''}"
                    min="0" 
                    step="1"
-                   onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})">
+                   onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})"
+                   required>
         </td>
         <td>
             <input type="number" 
                    id="valorUnitario-${itemCounter}" 
-                   value="${itemData?.valor_unitario || ''}"
                    min="0" 
-                   step="0.0001"
-                   placeholder="0.0000"
+                   step="0.01"
+                   placeholder="0.00"
                    onchange="calcularValorItem(${itemCounter})">
         </td>
-        <td><input type="text" id="valorTotal-${itemCounter}" value="${itemData?.valor_total || ''}" readonly style="background: #f5f5f5;"></td>
-        <td style="text-align: center;">
-            <button type="button" onclick="removeItem(${itemCounter})" class="btn-remove-item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
+        <td><input type="text" id="valorTotal-${itemCounter}" readonly></td>
+        <td><input type="text" id="ncm-${itemCounter}"></td>
+        <td>
+            <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
+                ✕
             </button>
         </td>
     `;
-    
-    calcularTotais();
+    container.appendChild(tr);
 }
 
 function removeItem(id) {
@@ -689,7 +646,7 @@ function calcularValorItem(id) {
     const valorUnitario = parseFloat(document.getElementById(`valorUnitario-${id}`).value) || 0;
     const valorTotal = quantidade * valorUnitario;
     
-    document.getElementById(`valorTotal-${id}`).value = valorTotal.toFixed(4);
+    document.getElementById(`valorTotal-${id}`).value = formatarMoeda(valorTotal);
     calcularTotais();
 }
 
@@ -699,23 +656,21 @@ function calcularTotais() {
     
     document.querySelectorAll('[id^="item-"]').forEach(item => {
         const id = item.id.replace('item-', '');
-        const qtd = parseFloat(document.getElementById(`quantidade-${id}`)?.value) || 0;
-        const valorItem = parseFloat(document.getElementById(`valorTotal-${id}`)?.value) || 0;
+        const valor = parseMoeda(document.getElementById(`valorTotal-${id}`).value);
+        const qtd = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
         
+        valorTotal += valor;
         quantidadeTotal += qtd;
-        valorTotal += valorItem;
     });
     
-    // Atualizar os campos calculados
-    document.getElementById('somaValorTotal').textContent = formatarMoeda(valorTotal);
-    document.getElementById('quantidade_total').value = quantidadeTotal;
+    document.getElementById('valorTotalPedido').value = formatarMoeda(valorTotal);
+    document.getElementById('quantidade').value = quantidadeTotal;
 }
 
 function buscarDadosEstoque(itemId) {
     const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
     const especificacaoInput = document.getElementById(`especificacao-${itemId}`);
     const ncmInput = document.getElementById(`ncm-${itemId}`);
-    const valorUnitarioInput = document.getElementById(`valorUnitario-${itemId}`);
     
     if (!codigoInput || !especificacaoInput || !ncmInput) return;
     
@@ -723,28 +678,13 @@ function buscarDadosEstoque(itemId) {
     
     if (!codigo) return;
     
-    // Buscar no array de estoque
-    const itemEstoque = estoque.find(e => 
-        String(e.codigo) === String(codigo) || 
-        String(e.codigo_fornecedor) === String(codigo)
-    );
+    // Buscar APENAS pelo código do estoque
+    const itemEstoque = estoqueCache[codigo];
     
     if (itemEstoque) {
-        // Preencher descrição e NCM
-        if (itemEstoque.descricao) {
-            especificacaoInput.value = itemEstoque.descricao;
-        }
-        if (itemEstoque.ncm) {
-            ncmInput.value = itemEstoque.ncm;
-        }
-        if (itemEstoque.valor_unitario && valorUnitarioInput) {
-            valorUnitarioInput.value = parseFloat(itemEstoque.valor_unitario).toFixed(4);
-        }
-        
-        // Recalcular se já tiver quantidade
-        calcularValorItem(itemId);
-    } else {
-        console.log('Item não encontrado no estoque:', codigo);
+        // Preencher descrição e NCM AUTOMATICAMENTE
+        especificacaoInput.value = itemEstoque.descricao;
+        ncmInput.value = itemEstoque.ncm;
     }
 }
 
@@ -763,16 +703,12 @@ function verificarEstoque(itemId) {
         return;
     }
     
-    // Buscar no array de estoque
-    const itemEstoque = estoque.find(e => 
-        String(e.codigo) === String(codigo) || 
-        String(e.codigo_fornecedor) === String(codigo)
-    );
+    // Buscar APENAS pelo código
+    const itemEstoque = estoqueCache[codigo];
     
     if (!itemEstoque) {
         warningDiv.textContent = `⚠️ Código ${codigo} não encontrado no estoque`;
         warningDiv.style.display = 'block';
-        showMessage(`Código ${codigo} não encontrado no estoque`, 'error');
         return;
     }
     
@@ -787,167 +723,438 @@ function verificarEstoque(itemId) {
     }
 }
 
+function getItems() {
+    const items = [];
+    document.querySelectorAll('[id^="item-"]').forEach(item => {
+        const id = item.id.replace('item-', '');
+        const codigoEstoque = document.getElementById(`codigoEstoque-${id}`).value.trim();
+        const especificacao = document.getElementById(`especificacao-${id}`).value.trim();
+        const unidade = document.getElementById(`unidade-${id}`).value;
+        const quantidade = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
+        const valorUnitario = parseFloat(document.getElementById(`valorUnitario-${id}`).value) || 0;
+        const valorTotal = document.getElementById(`valorTotal-${id}`).value;
+        const ncm = document.getElementById(`ncm-${id}`).value.trim();
+        
+        if (codigoEstoque && unidade && quantidade > 0) {
+            items.push({
+                item: items.length + 1,
+                codigoEstoque,
+                especificacao,
+                unidade,
+                quantidade,
+                valorUnitario,
+                valorTotal,
+                ncm
+            });
+        }
+    });
+    return items;
+}
+
 // ============================================
-// NAVEGAÇÃO DE ABAS
+// MODAL DE FORMULÁRIO
 // ============================================
-function switchTab(tabId) {
-    currentTabIndex = tabs.indexOf(tabId);
+function openFormModal() {
+    editingId = null;
+    currentTabIndex = 0;
+    document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
+    resetForm();
     
-    tabs.forEach(id => {
-        document.getElementById(id).classList.remove('active');
+    // Gerar próximo código
+    const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => parseInt(p.codigo) || 0)) : 0;
+    document.getElementById('codigo').value = (maxCodigo + 1).toString();
+    
+    activateTab(0);
+    document.getElementById('formModal').classList.add('show');
+}
+
+function closeFormModal() {
+    document.getElementById('formModal').classList.remove('show');
+    resetForm();
+}
+
+function resetForm() {
+    document.querySelectorAll('#formModal input:not([type="checkbox"]), #formModal textarea, #formModal select').forEach(input => {
+        if (input.type === 'checkbox') {
+            input.checked = false;
+        } else {
+            input.value = '';
+        }
     });
     
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemCounter = 0;
+    addItem();
+}
+
+// ============================================
+// SALVAR PEDIDO
+// ============================================
+async function savePedido() {
+    // Validações básicas
+    const codigo = document.getElementById('codigo').value.trim();
+    const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
+    const razaoSocial = document.getElementById('razaoSocial').value.trim();
+    const endereco = document.getElementById('endereco').value.trim();
+    const vendedor = document.getElementById('vendedor').value.trim();
+    
+    if (!codigo || !cnpj || !razaoSocial || !endereco || !vendedor) {
+        showMessage('Preencha todos os campos obrigatórios!', 'error');
+        return;
+    }
+    
+    const items = getItems();
+    if (items.length === 0) {
+        showMessage('Adicione pelo menos um item ao pedido!', 'error');
+        return;
+    }
+    
+    // Verificar estoque
+    let estoqueInsuficiente = false;
+    items.forEach(item => {
+        const itemEstoque = estoqueCache[item.codigoEstoque];
+        if (!itemEstoque) {
+            showMessage(`Código ${item.codigoEstoque} não encontrado no estoque!`, 'error');
+            estoqueInsuficiente = true;
+            return;
+        }
+        
+        const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
+        if (item.quantidade > quantidadeDisponivel) {
+            showMessage(`A quantidade em estoque para o item ${item.codigoEstoque} é insuficiente para atender o pedido`, 'error');
+            estoqueInsuficiente = true;
+        }
     });
     
-    document.getElementById(tabId).classList.add('active');
-    document.querySelectorAll('.tab-btn')[currentTabIndex].classList.add('active');
+    if (estoqueInsuficiente) return;
     
-    updateNavigationButtons();
-}
-
-function nextTab() {
-    if (currentTabIndex < tabs.length - 1) {
-        currentTabIndex++;
-        switchTab(tabs[currentTabIndex]);
-    }
-}
-
-function previousTab() {
-    if (currentTabIndex > 0) {
-        currentTabIndex--;
-        switchTab(tabs[currentTabIndex]);
-    }
-}
-
-function updateNavigationButtons() {
-    const btnPrevious = document.getElementById('btnPrevious');
-    const btnNext = document.getElementById('btnNext');
-    const btnSave = document.getElementById('btnSave');
+    const pedido = {
+        codigo,
+        cnpj,
+        razao_social: razaoSocial,
+        inscricao_estadual: document.getElementById('inscricaoEstadual').value.trim(),
+        endereco,
+        telefone: document.getElementById('telefone').value.trim(),
+        contato: document.getElementById('contato').value.trim(),
+        email: document.getElementById('email').value.trim().toLowerCase(),
+        documento: document.getElementById('documento').value.trim(),
+        items,
+        valor_total: document.getElementById('valorTotalPedido').value,
+        peso: document.getElementById('peso').value,
+        quantidade: document.getElementById('quantidade').value,
+        volumes: document.getElementById('volumes').value,
+        local_entrega: document.getElementById('localEntrega').value.trim(),
+        setor: document.getElementById('setor').value.trim(),
+        previsao_entrega: document.getElementById('previsaoEntrega').value,
+        transportadora: document.getElementById('transportadora').value.trim(),
+        valor_frete: document.getElementById('valorFrete').value,
+        vendedor,
+        status: 'pendente'
+    };
     
-    if (btnPrevious) {
-        btnPrevious.style.display = currentTabIndex > 0 ? 'inline-flex' : 'none';
-    }
-    
-    if (btnNext) {
-        btnNext.style.display = currentTabIndex < tabs.length - 1 ? 'inline-flex' : 'none';
-    }
-    
-    if (btnSave) {
-        btnSave.style.display = currentTabIndex === tabs.length - 1 ? 'inline-flex' : 'none';
+    try {
+        const url = editingId ? `${API_URL}/pedidos/${editingId}` : `${API_URL}/pedidos`;
+        const method = editingId ? 'PATCH' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Token': sessionToken
+            },
+            body: JSON.stringify(pedido)
+        });
+        
+        if (!response.ok) throw new Error('Erro ao salvar pedido');
+        
+        await loadPedidos();
+        closeFormModal();
+        
+        if (editingId) {
+            showMessage(`Pedido ${codigo} atualizado`, 'success');
+        } else {
+            showMessage(`Pedido ${codigo} registrado`, 'success');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar:', error);
+        showMessage('Erro ao salvar pedido!', 'error');
     }
 }
 
 // ============================================
-// MODAL DE VISUALIZAÇÃO
+// DELETAR PEDIDO
+// ============================================
+async function deletePedido(id) {
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) return;
+    
+    if (!confirm(`Tem certeza que deseja excluir o pedido ${pedido.codigo}?\n\nEsta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Session-Token': sessionToken
+            }
+        });
+        
+        if (!response.ok) throw new Error('Erro ao excluir pedido');
+        
+        await loadPedidos();
+        showMessage(`Pedido ${pedido.codigo} excluído`, 'error');
+    } catch (error) {
+        console.error('Erro ao excluir:', error);
+        showMessage('Erro ao excluir pedido!', 'error');
+    }
+}
+
+// ============================================
+// EDITAR PEDIDO
+// ============================================
+async function editPedido(id) {
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) return;
+    
+    editingId = id;
+    currentTabIndex = 0;
+    document.getElementById('formTitle').textContent = `Editar Pedido Nº ${pedido.codigo}`;
+    
+    // Preencher campos
+    document.getElementById('codigo').value = pedido.codigo;
+    document.getElementById('cnpj').value = formatarCNPJ(pedido.cnpj);
+    document.getElementById('razaoSocial').value = pedido.razao_social;
+    document.getElementById('inscricaoEstadual').value = pedido.inscricao_estadual || '';
+    document.getElementById('endereco').value = pedido.endereco;
+    document.getElementById('telefone').value = pedido.telefone || '';
+    document.getElementById('contato').value = pedido.contato || '';
+    document.getElementById('email').value = pedido.email || '';
+    document.getElementById('documento').value = pedido.documento || '';
+    document.getElementById('valorTotalPedido').value = pedido.valor_total;
+    document.getElementById('peso').value = pedido.peso || '';
+    document.getElementById('quantidade').value = pedido.quantidade || '';
+    document.getElementById('volumes').value = pedido.volumes || '';
+    document.getElementById('localEntrega').value = pedido.local_entrega || '';
+    document.getElementById('setor').value = pedido.setor || '';
+    document.getElementById('previsaoEntrega').value = pedido.previsao_entrega || '';
+    document.getElementById('transportadora').value = pedido.transportadora || '';
+    document.getElementById('valorFrete').value = pedido.valor_frete || '';
+    document.getElementById('vendedor').value = pedido.vendedor || '';
+    
+    // Preencher itens
+    document.getElementById('itemsContainer').innerHTML = '';
+    itemCounter = 0;
+    
+    const items = Array.isArray(pedido.items) ? pedido.items : [];
+    if (items.length === 0) {
+        addItem();
+    } else {
+        items.forEach((item, index) => {
+            itemCounter++;
+            const container = document.getElementById('itemsContainer');
+            const tr = document.createElement('tr');
+            tr.id = `item-${itemCounter}`;
+            tr.innerHTML = `
+                <td><input type="text" value="${index + 1}" readonly style="text-align: center; width: 50px;"></td>
+                <td>
+                    <input type="text" 
+                           id="codigoEstoque-${itemCounter}" 
+                           value="${item.codigoEstoque || ''}"
+                           class="codigo-estoque"
+                           onblur="verificarEstoque(${itemCounter})"
+                           onchange="buscarDadosEstoque(${itemCounter})"
+                           required>
+                    <div id="estoque-warning-${itemCounter}" style="color: var(--alert-color); font-size: 0.75rem; margin-top: 4px; display: none;"></div>
+                </td>
+                <td><textarea id="especificacao-${itemCounter}" rows="2">${item.especificacao || ''}</textarea></td>
+                <td>
+                    <select id="unidade-${itemCounter}" required>
+                        <option value="">-</option>
+                        <option value="UN" ${item.unidade === 'UN' ? 'selected' : ''}>UN</option>
+                        <option value="MT" ${item.unidade === 'MT' ? 'selected' : ''}>MT</option>
+                        <option value="KG" ${item.unidade === 'KG' ? 'selected' : ''}>KG</option>
+                        <option value="PC" ${item.unidade === 'PC' ? 'selected' : ''}>PC</option>
+                        <option value="CX" ${item.unidade === 'CX' ? 'selected' : ''}>CX</option>
+                        <option value="LT" ${item.unidade === 'LT' ? 'selected' : ''}>LT</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="number" 
+                           id="quantidade-${itemCounter}" 
+                           value="${item.quantidade || 0}"
+                           min="0" 
+                           step="1"
+                           onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})"
+                           required>
+                </td>
+                <td>
+                    <input type="number" 
+                           id="valorUnitario-${itemCounter}" 
+                           value="${item.valorUnitario || 0}"
+                           min="0" 
+                           step="0.01"
+                           onchange="calcularValorItem(${itemCounter})">
+                </td>
+                <td><input type="text" id="valorTotal-${itemCounter}" value="${item.valorTotal || 'R$ 0,00'}" readonly></td>
+                <td><input type="text" id="ncm-${itemCounter}" value="${item.ncm || ''}"></td>
+                <td>
+                    <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
+                        ✕
+                    </button>
+                </td>
+            `;
+            container.appendChild(tr);
+        });
+    }
+    
+    activateTab(0);
+    document.getElementById('formModal').classList.add('show');
+}
+
+// ============================================
+// VISUALIZAR PEDIDO
 // ============================================
 function viewPedido(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
     
-    document.getElementById('modalNumero').textContent = pedido.codigo || '-';
+    document.getElementById('modalCodigo').textContent = pedido.codigo;
     
-    // Aba Geral
-    document.getElementById('info-tab-geral').innerHTML = `
-        <div class="info-section">
-            <p><strong>Código:</strong> ${pedido.codigo || '-'}</p>
-            <p><strong>Documento:</strong> ${pedido.documento || '-'}</p>
-            <p><strong>Status:</strong> <span class="status-badge status-${pedido.status || 'pendente'}">${pedido.status === 'emitido' ? 'Emitido' : 'Pendente'}</span></p>
-        </div>
-    `;
-    
-    // Aba Faturamento
+    // Tab Faturamento
     document.getElementById('info-tab-faturamento').innerHTML = `
-        <div class="info-section">
-            <p><strong>CNPJ:</strong> ${pedido.cnpj ? formatarCNPJ(pedido.cnpj) : '-'}</p>
-            <p><strong>Razão Social:</strong> ${pedido.razao_social || '-'}</p>
-            <p><strong>Inscrição Estadual:</strong> ${pedido.inscricao_estadual || '-'}</p>
-            <p><strong>Endereço:</strong> ${pedido.endereco || '-'}</p>
-            <p><strong>Bairro:</strong> ${pedido.bairro || '-'}</p>
-            <p><strong>Município:</strong> ${pedido.municipio || '-'}</p>
-            <p><strong>UF:</strong> ${pedido.uf || '-'}</p>
-            <p><strong>Número:</strong> ${pedido.numero || '-'}</p>
-        </div>
-    `;
-    
-    // Aba Contato
-    document.getElementById('info-tab-contato').innerHTML = `
-        <div class="info-section">
-            <p><strong>Telefone:</strong> ${pedido.telefone || '-'}</p>
-            <p><strong>Contato:</strong> ${pedido.contato || '-'}</p>
-            <p><strong>E-mail:</strong> ${pedido.email || '-'}</p>
-        </div>
-    `;
-    
-    // Aba Itens
-    const itens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens || '[]') : (pedido.itens || []);
-    const itensHtml = itens.map(item => `
-        <tr>
-            <td>${item.item}</td>
-            <td>${item.estoque}</td>
-            <td>${item.descricao}</td>
-            <td>${item.ncm}</td>
-            <td>${item.un}</td>
-            <td>${item.qtd}</td>
-            <td>${item.valor_unitario}</td>
-            <td>${item.valor_total}</td>
-        </tr>
-    `).join('');
-    
-    const valorTotalItens = itens.reduce((sum, item) => sum + (parseFloat(item.valor_total) || 0), 0);
-    
-    document.getElementById('info-tab-itens').innerHTML = `
-        <div class="info-section">
-            <table class="items-table">
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Estoque</th>
-                        <th>Descrição</th>
-                        <th>NCM</th>
-                        <th>UN</th>
-                        <th>QTD</th>
-                        <th>Valor Unit.</th>
-                        <th>Valor Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${itensHtml}
-                </tbody>
-            </table>
-            <div style="margin-top: 1rem;">
-                <p><strong>Valor Total:</strong> ${formatarMoeda(valorTotalItens)}</p>
-                <p><strong>Peso (Kg):</strong> ${pedido.peso || '-'}</p>
-                <p><strong>Quantidade Total:</strong> ${pedido.quantidade_total || '-'}</p>
-                <p><strong>Volumes:</strong> ${pedido.volumes || '-'}</p>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Código</label>
+                <input type="text" value="${pedido.codigo}" readonly>
+            </div>
+            <div class="form-group">
+                <label>CNPJ</label>
+                <input type="text" value="${formatarCNPJ(pedido.cnpj)}" readonly>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Razão Social</label>
+                <input type="text" value="${pedido.razao_social}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Inscrição Estadual</label>
+                <input type="text" value="${pedido.inscricao_estadual || '-'}" readonly>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Endereço</label>
+                <input type="text" value="${pedido.endereco}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Telefone</label>
+                <input type="text" value="${pedido.telefone || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Contato</label>
+                <input type="text" value="${pedido.contato || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>E-mail</label>
+                <input type="text" value="${pedido.email || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Documento</label>
+                <input type="text" value="${pedido.documento || '-'}" readonly>
             </div>
         </div>
     `;
     
-    // Aba Entrega
+    // Tab Itens
+    const items = Array.isArray(pedido.items) ? pedido.items : [];
+    document.getElementById('info-tab-itens').innerHTML = `
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Cód. Estoque</th>
+                    <th>Especificação</th>
+                    <th>UN</th>
+                    <th>Quantidade</th>
+                    <th>Valor Unitário</th>
+                    <th>Valor Total</th>
+                    <th>NCM</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((item, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${item.codigoEstoque || '-'}</td>
+                        <td>${item.especificacao || '-'}</td>
+                        <td>${item.unidade || '-'}</td>
+                        <td>${item.quantidade || 0}</td>
+                        <td>${formatarMoeda(item.valorUnitario || 0)}</td>
+                        <td>${item.valorTotal || 'R$ 0,00'}</td>
+                        <td>${item.ncm || '-'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        <div class="form-grid" style="margin-top: 1.5rem;">
+            <div class="form-group">
+                <label>Valor Total</label>
+                <input type="text" value="${pedido.valor_total || 'R$ 0,00'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Peso (kg)</label>
+                <input type="text" value="${pedido.peso || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Quantidade Total</label>
+                <input type="text" value="${pedido.quantidade || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Volumes</label>
+                <input type="text" value="${pedido.volumes || '-'}" readonly>
+            </div>
+        </div>
+    `;
+    
+    // Tab Entrega
     document.getElementById('info-tab-entrega').innerHTML = `
-        <div class="info-section">
-            <p><strong>Local de Entrega:</strong> ${pedido.local_entrega || '-'}</p>
-            <p><strong>Setor:</strong> ${pedido.setor || '-'}</p>
-            <p><strong>Previsão de Entrega:</strong> ${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}</p>
+        <div class="form-grid">
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Local de Entrega</label>
+                <textarea readonly rows="3">${pedido.local_entrega || '-'}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Setor</label>
+                <input type="text" value="${pedido.setor || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Previsão de Entrega</label>
+                <input type="text" value="${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}" readonly>
+            </div>
         </div>
     `;
     
-    // Aba Transporte
+    // Tab Transporte
     document.getElementById('info-tab-transporte').innerHTML = `
-        <div class="info-section">
-            <p><strong>Transportadora:</strong> ${pedido.transportadora || '-'}</p>
-            <p><strong>Frete:</strong> ${pedido.frete ? formatarMoeda(pedido.frete) : '-'}</p>
-            <p><strong>Vendedor:</strong> ${pedido.vendedor || '-'}</p>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Transportadora</label>
+                <input type="text" value="${pedido.transportadora || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Valor do Frete</label>
+                <input type="text" value="${pedido.valor_frete || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Vendedor</label>
+                <input type="text" value="${pedido.vendedor || '-'}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <input type="text" value="${pedido.status === 'emitida' ? 'Emitida' : 'Pendente'}" readonly>
+            </div>
         </div>
     `;
     
-    // Resetar abas
-    infoTabs.forEach((tabId, index) => {
-        document.getElementById(tabId).classList.toggle('active', index === 0);
-    });
-    
+    switchInfoTab('info-tab-faturamento');
     document.getElementById('infoModal').classList.add('show');
 }
 
@@ -956,219 +1163,305 @@ function closeInfoModal() {
 }
 
 function switchInfoTab(tabId) {
-    const currentIndex = infoTabs.indexOf(tabId);
-    
-    infoTabs.forEach(id => {
-        document.getElementById(id).classList.remove('active');
-    });
-    
-    const tabButtons = document.querySelectorAll('#infoModal .tab-btn');
-    tabButtons.forEach(btn => {
-        btn.classList.remove('active');
-    });
+    document.querySelectorAll('#infoModal .tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('#infoModal .tab-btn').forEach(btn => btn.classList.remove('active'));
     
     document.getElementById(tabId).classList.add('active');
-    tabButtons[currentIndex].classList.add('active');
-    
-    // Atualizar botões de navegação
-    const btnPrevious = document.getElementById('btnInfoPrevious');
-    const btnNext = document.getElementById('btnInfoNext');
-    
-    if (btnPrevious) {
-        btnPrevious.style.display = currentIndex > 0 ? 'inline-flex' : 'none';
-    }
-    
-    if (btnNext) {
-        btnNext.style.display = currentIndex < infoTabs.length - 1 ? 'inline-flex' : 'none';
-    }
+    event.target.classList.add('active');
 }
 
-function nextInfoTab() {
-    const currentActive = document.querySelector('#infoModal .tab-content.active');
-    const currentIndex = infoTabs.indexOf(currentActive.id);
+// ============================================
+// TOGGLE EMISSÃO (DEBITAR ESTOQUE)
+// ============================================
+async function toggleEmissao(id, checked) {
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) return;
     
-    if (currentIndex < infoTabs.length - 1) {
-        switchInfoTab(infoTabs[currentIndex + 1]);
-    }
-}
-
-function previousInfoTab() {
-    const currentActive = document.querySelector('#infoModal .tab-content.active');
-    const currentIndex = infoTabs.indexOf(currentActive.id);
-    
-    if (currentIndex > 0) {
-        switchInfoTab(infoTabs[currentIndex - 1]);
+    if (checked && pedido.status === 'pendente') {
+        // Verificar disponibilidade primeiro
+        const items = Array.isArray(pedido.items) ? pedido.items : [];
+        let estoqueInsuficiente = false;
+        
+        for (const item of items) {
+            const itemEstoque = estoqueCache[item.codigoEstoque];
+            if (!itemEstoque) {
+                showMessage(`Código ${item.codigoEstoque} não encontrado no estoque`, 'error');
+                document.getElementById(`check-${id}`).checked = false;
+                return;
+            }
+            
+            const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
+            if (item.quantidade > quantidadeDisponivel) {
+                showMessage(`A quantidade em estoque para o item ${item.codigoEstoque} é insuficiente para atender o pedido`, 'error');
+                estoqueInsuficiente = true;
+            }
+        }
+        
+        if (estoqueInsuficiente) {
+            document.getElementById(`check-${id}`).checked = false;
+            return;
+        }
+        
+        // Confirmar emissão
+        if (!confirm(`Confirmar emissão para o pedido ${pedido.codigo}?`)) {
+            document.getElementById(`check-${id}`).checked = false;
+            return;
+        }
+        
+        // Debitar estoque
+        try {
+            for (const item of items) {
+                const itemEstoque = estoqueCache[item.codigoEstoque];
+                const novaQuantidade = parseFloat(itemEstoque.quantidade) - item.quantidade;
+                
+                const response = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Token': sessionToken
+                    },
+                    body: JSON.stringify({
+                        quantidade: novaQuantidade
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Erro ao atualizar estoque');
+            }
+            
+            // Atualizar status do pedido
+            const response = await fetch(`${API_URL}/pedidos/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': sessionToken
+                },
+                body: JSON.stringify({
+                    status: 'emitida',
+                    data_emissao: new Date().toISOString()
+                })
+            });
+            
+            if (!response.ok) throw new Error('Erro ao atualizar pedido');
+            
+            await loadPedidos();
+            await loadEstoque();
+            showMessage(`Pedido ${pedido.codigo} emitido`, 'success');
+        } catch (error) {
+            console.error('Erro ao emitir:', error);
+            showMessage('Erro ao emitir pedido', 'error');
+            document.getElementById(`check-${id}`).checked = false;
+        }
+    } else if (!checked && pedido.status === 'emitida') {
+        // Reverter emissão
+        if (!confirm(`Reverter emissão do pedido ${pedido.codigo}?\n\nAs quantidades retornarão ao estoque.`)) {
+            document.getElementById(`check-${id}`).checked = true;
+            return;
+        }
+        
+        try {
+            const items = Array.isArray(pedido.items) ? pedido.items : [];
+            
+            // Creditar estoque de volta
+            for (const item of items) {
+                const itemEstoque = estoqueCache[item.codigoEstoque];
+                if (!itemEstoque) continue;
+                
+                const novaQuantidade = parseFloat(itemEstoque.quantidade) + item.quantidade;
+                
+                const response = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Token': sessionToken
+                    },
+                    body: JSON.stringify({
+                        quantidade: novaQuantidade
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Erro ao atualizar estoque');
+            }
+            }
+            
+            // Atualizar status do pedido
+            const response = await fetch(`${API_URL}/pedidos/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': sessionToken
+                },
+                body: JSON.stringify({
+                    status: 'pendente',
+                    data_emissao: null
+                })
+            });
+            
+            if (!response.ok) throw new Error('Erro ao atualizar pedido');
+            
+            await loadPedidos();
+            await loadEstoque();
+            showMessage(`Emissão do pedido ${pedido.codigo} revertida!`, 'success');
+        } catch (error) {
+            console.error('Erro ao reverter:', error);
+            showMessage('Erro ao reverter emissão!', 'error');
+            document.getElementById(`check-${id}`).checked = true;
+        }
     }
 }
 
 // ============================================
-// ETIQUETA
+// ETIQUETAS
 // ============================================
-function openEtiquetaModal(id) {
-    etiquetaPedidoId = id;
-    document.getElementById('numeroNotaFiscal').value = '';
+function abrirModalEtiquetas() {
     document.getElementById('etiquetaModal').classList.add('show');
 }
 
 function closeEtiquetaModal() {
     document.getElementById('etiquetaModal').classList.remove('show');
-    etiquetaPedidoId = null;
+    document.getElementById('etiquetaNF').value = '';
+    document.getElementById('etiquetaVolumes').value = '';
+    document.getElementById('etiquetaDestinatario').value = '';
+    document.getElementById('etiquetaMunicipio').value = '';
+    document.getElementById('etiquetaEndereco').value = '';
+    document.getElementById('etiquetaInfo').value = '';
 }
 
-function imprimirEtiqueta() {
-    const numeroNF = document.getElementById('numeroNotaFiscal').value.trim();
+function imprimirEtiquetas() {
+    const nf = document.getElementById('etiquetaNF').value.trim();
+    const totalVolumes = parseInt(document.getElementById('etiquetaVolumes').value);
+    const destinatario = document.getElementById('etiquetaDestinatario').value.trim();
+    const municipio = document.getElementById('etiquetaMunicipio').value.trim();
+    const endereco = document.getElementById('etiquetaEndereco').value.trim();
+    const infoAdicional = document.getElementById('etiquetaInfo').value.trim();
     
-    if (!numeroNF) {
-        showMessage('Por favor, informe o número da nota fiscal', 'error');
+    if (!nf || !totalVolumes || !destinatario || !municipio || !endereco) {
+        showMessage('Preencha todos os campos obrigatórios!', 'error');
         return;
     }
     
-    const pedido = pedidos.find(p => p.id === etiquetaPedidoId);
-    if (!pedido) return;
+    let labelsContent = '';
     
-    // Criar conteúdo da etiqueta
-    const etiquetaHtml = `
-        <!DOCTYPE html>
+    for (let i = 1; i <= totalVolumes; i++) {
+        labelsContent += `
+            <div class='label-container'>
+                <div class='logo-container'>
+                    <img src='ETIQUETA.png' alt='Logo' style='max-width: 100px; max-height: 100px; margin-right: 15px;'>
+                    <div>
+                        <div class='header'>I.R COMÉRCIO E <br>MATERIAIS ELÉTRICOS LTDA</div>
+                        <div class='cnpj'>CNPJ: 33.149.502/0001-38</div>
+                    </div>
+                </div>
+                <div class='nf-volume-container'>
+                    <div class='nf-volume'>NF: ${nf}</div>
+                    <div class='volume'>VOLUME: ${i}/${totalVolumes}</div>
+                </div>
+                <hr>
+                <div class='section-title'>DESTINATÁRIO:</div>
+                <div class='section'>${destinatario}</div>
+                <div class='section'>${municipio}</div>
+                <div class='section'>${endereco}</div>
+                ${infoAdicional ? `<div class='section-title additional-info'>LOCAL DE ENTREGA:</div><div class='section'>${infoAdicional}</div>` : ""}
+            </div>
+        `;
+    }
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
         <html>
         <head>
-            <meta charset="UTF-8">
-            <title>Etiqueta - Pedido ${pedido.codigo}</title>
+            <title>Etiquetas NF ${nf}</title>
             <style>
+                @page {
+                    size: 100mm 150mm;
+                    margin: 2mm;
+                }
                 body {
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    font-size: 12px;
+                    text-align: left;
+                    margin: 0;
+                    padding: 0;
                 }
-                .etiqueta {
-                    border: 2px solid #000;
-                    padding: 20px;
-                    max-width: 600px;
+                .label-container {
+                    width: 94mm;
+                    height: 144mm;
+                    padding: 2mm;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-start;
+                    overflow: hidden;
+                    page-break-after: always;
                 }
-                .etiqueta h2 {
+                .logo-container {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 10px;
+                }
+                .logo-container img {
+                    max-width: 100px;
+                    max-height: 100px;
+                    margin-right: 15px;
+                }
+                .header, .cnpj, .section-title {
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                .header {
+                    font-size: 14px;
+                    line-height: 1.2;
+                }
+                .cnpj {
+                    font-size: 12px;
+                }
+                .nf-volume-container {
                     text-align: center;
-                    margin: 0 0 20px 0;
+                    border: 1px solid black;
+                    padding: 5px;
+                    margin: 10px 0;
                 }
-                .etiqueta p {
-                    margin: 8px 0;
-                    line-height: 1.4;
+                .nf-volume {
+                    font-size: 30px;
+                    font-weight: bold;
+                    margin-bottom: 2px;
                 }
-                .etiqueta strong {
-                    display: inline-block;
-                    width: 180px;
+                .volume {
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
                 }
-                @media print {
-                    body { margin: 0; }
-                    .etiqueta { border: 1px solid #000; }
+                .section {
+                    line-height: 1.2;
+                    word-wrap: break-word;
+                    margin-top: 2px;
+                }
+                .additional-info {
+                    margin-top: 10px;
+                }
+                hr {
+                    border: none;
+                    border-top: 1px solid #000;
+                    margin: 10px 0;
                 }
             </style>
         </head>
         <body>
-            <div class="etiqueta">
-                <h2>ETIQUETA DE ENVIO</h2>
-                <p><strong>Nota Fiscal:</strong> ${numeroNF}</p>
-                <p><strong>Pedido Nº:</strong> ${pedido.codigo}</p>
-                <p><strong>Total de Volumes:</strong> ${pedido.quantidade_total || pedido.volumes || '-'}</p>
-                <p><strong>Destinatário:</strong> ${pedido.razao_social || '-'}</p>
-                <p><strong>Município:</strong> ${pedido.municipio || '-'}</p>
-                <p><strong>Endereço:</strong> ${pedido.endereco || '-'}, ${pedido.numero || ''} - ${pedido.bairro || '-'}</p>
-                <p><strong>Informações Adicionais:</strong> ${pedido.local_entrega || ''} ${pedido.setor ? '- ' + pedido.setor : ''}</p>
-            </div>
+            ${labelsContent}
             <script>
                 window.onload = function() {
-                    window.print();
-                    setTimeout(() => window.close(), 100);
+                    setTimeout(function() {
+                        window.print();
+                        window.onafterprint = function() { 
+                            window.close(); 
+                        };
+                    }, 500);
                 };
-            </script>
+            <\/script>
         </body>
         </html>
-    `;
-    
-    // Abrir em nova janela e imprimir
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(etiquetaHtml);
+    `);
     printWindow.document.close();
     
     closeEtiquetaModal();
-    showMessage('Etiqueta enviada para impressão', 'success');
+    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
 }
-
-// ============================================
-// CALENDÁRIO
-// ============================================
-function updateMonthDisplay() {
-    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    
-    const display = document.getElementById('currentMonth');
-    if (display) {
-        display.textContent = `${monthNames[selectedMonth]} ${selectedYear}`;
-    }
-}
-
-function changeMonth(delta) {
-    selectedMonth += delta;
-    
-    if (selectedMonth > 11) {
-        selectedMonth = 0;
-        selectedYear++;
-    } else if (selectedMonth < 0) {
-        selectedMonth = 11;
-        selectedYear--;
-    }
-    
-    updateMonthDisplay();
-    updateDisplay();
-}
-
-function toggleCalendar() {
-    const modal = document.getElementById('calendarModal');
-    const isVisible = modal.style.display === 'flex';
-    modal.style.display = isVisible ? 'none' : 'flex';
-    
-    if (!isVisible) {
-        renderCalendar();
-    }
-}
-
-function renderCalendar() {
-    const container = document.getElementById('calendarMonths');
-    const yearDisplay = document.getElementById('calendarYear');
-    
-    if (yearDisplay) {
-        yearDisplay.textContent = selectedYear;
-    }
-    
-    if (!container) return;
-    
-    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    
-    container.innerHTML = monthNames.map((month, index) => {
-        const isSelected = index === selectedMonth && selectedYear === parseInt(yearDisplay?.textContent || selectedYear);
-        return `
-            <button class="calendar-month ${isSelected ? 'selected' : ''}" 
-                    onclick="selectMonth(${index})">
-                ${month}
-            </button>
-        `;
-    }).join('');
-}
-
-function selectMonth(month) {
-    selectedMonth = month;
-    updateMonthDisplay();
-    updateDisplay();
-    toggleCalendar();
-}
-
-function changeCalendarYear(delta) {
-    selectedYear += delta;
-    renderCalendar();
-}
-
-// Fechar calendário ao clicar fora
-document.addEventListener('click', (e) => {
-    const calendarModal = document.getElementById('calendarModal');
-    if (e.target === calendarModal) {
-        toggleCalendar();
-    }
-});
