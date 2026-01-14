@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedido de Faturamento</title>
     <link rel="icon" type="image/png" href="I.R.-COMERCIO-E-MATERIAIS-ELETRICOS-PRETO.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="pedido-styles.css">
 </head>
 <body>
     <!-- Splash Screen -->
@@ -316,11 +316,11 @@
                                     </div>
                                     <div class="summary-item">
                                         <label>Quantidade Total:</label>
-                                        <input type="number" id="quantidade_total" min="1">
+                                        <input type="number" id="quantidade_total" min="0" readonly style="background: #f5f5f5; cursor: not-allowed;">
                                     </div>
                                     <div class="summary-item">
                                         <label>Volumes:</label>
-                                        <input type="number" id="volumes" min="1">
+                                        <input type="number" id="volumes" min="1" placeholder="Informe manualmente">
                                     </div>
                                 </div>
                             </div>
@@ -434,6 +434,6 @@
             if (splash) splash.style.display = 'none';
         }, 3000);
     </script>
-    <script src="script.js"></script>
+    <script src="pedido-script.js"></script>
 </body>
 </html>
