@@ -791,6 +791,11 @@ function resetForm() {
 // SALVAR PEDIDO
 // ============================================
 async function savePedido() {
+    // GARANTIR que não está editando ao salvar novo
+    if (document.getElementById('formTitle').textContent === 'Novo Pedido de Faturamento') {
+        editingId = null;
+    }
+    
     // Validações básicas
     const codigo = document.getElementById('codigo').value.trim();
     const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
@@ -853,8 +858,13 @@ async function savePedido() {
     };
     
     try {
+        console.log('🔍 DEBUG: editingId =', editingId, 'tipo:', typeof editingId);
+        
         const url = editingId ? `${API_URL}/pedidos/${editingId}` : `${API_URL}/pedidos`;
         const method = editingId ? 'PATCH' : 'POST';
+        
+        console.log('📡 URL:', url);
+        console.log('📡 Method:', method);
         
         const response = await fetch(url, {
             method,
@@ -865,7 +875,11 @@ async function savePedido() {
             body: JSON.stringify(pedido)
         });
         
-        if (!response.ok) throw new Error('Erro ao salvar pedido');
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erro do servidor:', errorText);
+            throw new Error('Erro ao salvar pedido');
+        }
         
         await loadPedidos();
         closeFormModal();
