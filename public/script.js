@@ -494,7 +494,7 @@ function updateTable() {
                            class="styled-checkbox" 
                            id="check-${pedido.id}"
                            ${pedido.status === 'emitida' ? 'checked' : ''}
-                           onchange="toggleEmissao(${pedido.id}, this.checked)">
+                           onchange="toggleEmissao('${pedido.id}', this.checked)">
                     <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
                 </div>
             </td>
@@ -510,13 +510,13 @@ function updateTable() {
             </td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido(${pedido.id})" class="action-btn" style="background: #F59E0B;">
+                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #F59E0B;">
                         Ver
                     </button>
-                    <button onclick="editPedido(${pedido.id})" class="action-btn" style="background: #6B7280;">
+                    <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">
                         Editar
                     </button>
-                    <button onclick="deletePedido(${pedido.id})" class="action-btn" style="background: #EF4444;">
+                    <button onclick="deletePedido('${pedido.id}')" class="action-btn" style="background: #EF4444;">
                         Excluir
                     </button>
                 </div>
