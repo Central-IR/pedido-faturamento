@@ -50,7 +50,7 @@ function showMessage(message, type = 'success') {
     setTimeout(() => {
         div.style.animation = 'slideOut 0.3s ease forwards';
         setTimeout(() => div.remove(), 300);
-    }, 3000);
+    }, 2000); // Reduzido de 3000 para 2000ms
 }
 
 // ============================================
@@ -115,21 +115,17 @@ function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
 
 async function inicializarApp() {
     await checkConnection();
-    await loadPedidos();
-    await loadEstoque();
+    
+    // Carregamento paralelo para ser mais rápido
+    await Promise.all([loadPedidos(), loadEstoque()]);
     
     // Formatar CNPJ
     document.getElementById('cnpj')?.addEventListener('input', (e) => {
         e.target.value = formatarCNPJ(e.target.value);
     });
     
-    setInterval(checkConnection, 15000);
-    setInterval(() => {
-        if (isOnline) {
-            loadPedidos();
-            loadEstoque();
-        }
-    }, 10000);
+    // Verificar conexão a cada 30 segundos (menos frequente)
+    setInterval(checkConnection, 30000);
 }
 
 // ============================================
@@ -193,18 +189,26 @@ async function syncData() {
     if (btnSync) {
         btnSync.disabled = true;
         btnSync.style.opacity = '0.5';
+        // Adicionar animação de rotação
+        const svg = btnSync.querySelector('svg');
+        if (svg) {
+            svg.style.animation = 'spin 1s linear infinite';
+        }
     }
     
     try {
-        await loadPedidos();
-        await loadEstoque();
-        showMessage('Dados sincronizados com sucesso!', 'success');
+        await Promise.all([loadPedidos(), loadEstoque()]);
+        showMessage('Dados sincronizados', 'success');
     } catch (error) {
-        showMessage('Erro ao sincronizar dados!', 'error');
+        showMessage('Erro ao sincronizar', 'error');
     } finally {
         if (btnSync) {
             btnSync.disabled = false;
             btnSync.style.opacity = '1';
+            const svg = btnSync.querySelector('svg');
+            if (svg) {
+                svg.style.animation = '';
+            }
         }
     }
 }
@@ -1228,6 +1232,13 @@ async function toggleEmissao(id, checked) {
         
         // Debitar estoque
         try {
+            // Mostrar indicador de carregamento
+            const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
+            if (checkboxLabel) {
+                checkboxLabel.style.opacity = '0.5';
+                checkboxLabel.style.pointerEvents = 'none';
+            }
+            
             for (const item of items) {
                 const itemEstoque = estoqueCache[item.codigoEstoque];
                 const novaQuantidade = parseFloat(itemEstoque.quantidade) - item.quantidade;
@@ -1261,8 +1272,15 @@ async function toggleEmissao(id, checked) {
             
             if (!response.ok) throw new Error('Erro ao atualizar pedido');
             
-            await loadPedidos();
-            await loadEstoque();
+            // Recarregar dados
+            await Promise.all([loadPedidos(), loadEstoque()]);
+            
+            // Restaurar checkbox
+            if (checkboxLabel) {
+                checkboxLabel.style.opacity = '1';
+                checkboxLabel.style.pointerEvents = 'auto';
+            }
+            
             showMessage(`Pedido ${pedido.codigo} emitido`, 'success');
         } catch (error) {
             console.error('Erro ao emitir:', error);
@@ -1278,6 +1296,13 @@ async function toggleEmissao(id, checked) {
         
         try {
             const items = Array.isArray(pedido.items) ? pedido.items : [];
+            
+            // Mostrar indicador de carregamento
+            const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
+            if (checkboxLabel) {
+                checkboxLabel.style.opacity = '0.5';
+                checkboxLabel.style.pointerEvents = 'none';
+            }
             
             // Creditar estoque de volta
             for (const item of items) {
@@ -1315,8 +1340,15 @@ async function toggleEmissao(id, checked) {
             
             if (!response.ok) throw new Error('Erro ao atualizar pedido');
             
-            await loadPedidos();
-            await loadEstoque();
+            // Recarregar dados
+            await Promise.all([loadPedidos(), loadEstoque()]);
+            
+            // Restaurar checkbox
+            if (checkboxLabel) {
+                checkboxLabel.style.opacity = '1';
+                checkboxLabel.style.pointerEvents = 'auto';
+            }
+            
             showMessage(`Emissão do pedido ${pedido.codigo} revertida!`, 'success');
         } catch (error) {
             console.error('Erro ao reverter:', error);
