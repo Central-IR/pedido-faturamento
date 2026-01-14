@@ -1281,7 +1281,6 @@ async function toggleEmissao(id, checked) {
                 
                 if (!response.ok) throw new Error('Erro ao atualizar estoque');
             }
-            }
             
             // Atualizar status do pedido
             const response = await fetch(`${API_URL}/pedidos/${id}`, {
