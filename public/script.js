@@ -401,6 +401,9 @@ function openFormModal() {
     document.getElementById('codigo').value = 'Gerado automaticamente';
     document.getElementById('itensTableBody').innerHTML = '';
     
+    // Adicionar primeiro item
+    adicionarItem();
+    
     // Resetar abas
     tabs.forEach((tabId, index) => {
         document.getElementById(tabId).classList.toggle('active', index === 0);
@@ -454,9 +457,13 @@ function editPedido(id) {
     document.getElementById('itensTableBody').innerHTML = '';
     itemCounter = 0;
     
-    itens.forEach(item => {
-        adicionarItem(item);
-    });
+    if (itens.length > 0) {
+        itens.forEach(item => {
+            adicionarItem(item);
+        });
+    } else {
+        adicionarItem();
+    }
     
     // Resetar abas
     tabs.forEach((tabId, index) => {
@@ -470,21 +477,30 @@ function editPedido(id) {
 
 async function savePedido() {
     // Coletar dados do formulário
-    const itensTableBody = document.getElementById('itensTableBody');
     const itens = [];
     
-    itensTableBody.querySelectorAll('tr').forEach(row => {
-        const item = {
-            item: row.querySelector('[data-field="item"]').value,
-            estoque: row.querySelector('[data-field="estoque"]').value,
-            descricao: row.querySelector('[data-field="descricao"]').value,
-            ncm: row.querySelector('[data-field="ncm"]').value,
-            un: row.querySelector('[data-field="un"]').value,
-            qtd: row.querySelector('[data-field="qtd"]').value,
-            valor_unitario: row.querySelector('[data-field="valor_unitario"]').value,
-            valor_total: row.querySelector('[data-field="valor_total"]').value
-        };
-        itens.push(item);
+    document.querySelectorAll('[id^="item-"]').forEach((row, index) => {
+        const id = row.id.replace('item-', '');
+        const codigoEstoque = document.getElementById(`codigoEstoque-${id}`)?.value || '';
+        const especificacao = document.getElementById(`especificacao-${id}`)?.value || '';
+        const ncm = document.getElementById(`ncm-${id}`)?.value || '';
+        const unidade = document.getElementById(`unidade-${id}`)?.value || '';
+        const quantidade = document.getElementById(`quantidade-${id}`)?.value || '';
+        const valorUnitario = document.getElementById(`valorUnitario-${id}`)?.value || '';
+        const valorTotal = document.getElementById(`valorTotal-${id}`)?.value || '';
+        
+        if (codigoEstoque && quantidade) {
+            itens.push({
+                item: index + 1,
+                estoque: codigoEstoque,
+                descricao: especificacao,
+                ncm: ncm,
+                un: unidade,
+                qtd: quantidade,
+                valor_unitario: valorUnitario,
+                valor_total: valorTotal
+            });
+        }
     });
     
     const pedidoData = {
@@ -603,17 +619,52 @@ function adicionarItem(itemData = null) {
     const tbody = document.getElementById('itensTableBody');
     const row = tbody.insertRow();
     
+    row.id = `item-${itemCounter}`;
     row.innerHTML = `
-        <td><input type="text" data-field="item" value="${itemData?.item || itemCounter}" readonly style="width: 40px; text-align: center; background: #f5f5f5;"></td>
-        <td><input type="text" data-field="estoque" value="${itemData?.estoque || ''}" onchange="buscarEstoque(this)" placeholder="Código"></td>
-        <td><input type="text" data-field="descricao" value="${itemData?.descricao || ''}" style="min-width: 180px;"></td>
-        <td><input type="text" data-field="ncm" value="${itemData?.ncm || ''}" readonly style="background: #f5f5f5;"></td>
-        <td><input type="text" data-field="un" value="${itemData?.un || ''}" style="width: 50px;"></td>
-        <td><input type="number" data-field="qtd" value="${itemData?.qtd || ''}" onchange="calcularValorTotal(this)" step="1" min="0"></td>
-        <td><input type="number" data-field="valor_unitario" value="${itemData?.valor_unitario || ''}" onchange="calcularValorTotal(this)" step="0.0001" min="0"></td>
-        <td><input type="text" data-field="valor_total" value="${itemData?.valor_total || '0.00'}" readonly style="background: #f5f5f5;"></td>
+        <td><input type="text" value="${itemData?.item || itemCounter}" readonly style="width: 50px; text-align: center; background: #f5f5f5;"></td>
+        <td>
+            <input type="text" 
+                   id="codigoEstoque-${itemCounter}" 
+                   class="codigo-estoque"
+                   value="${itemData?.estoque || ''}"
+                   placeholder="CÓDIGO"
+                   onblur="verificarEstoque(${itemCounter})"
+                   onchange="buscarDadosEstoque(${itemCounter})">
+            <div id="estoque-warning-${itemCounter}" style="color: var(--alert-color); font-size: 0.75rem; margin-top: 4px; display: none;"></div>
+        </td>
+        <td><textarea id="especificacao-${itemCounter}" rows="2" style="min-width: 180px;">${itemData?.descricao || ''}</textarea></td>
+        <td><input type="text" id="ncm-${itemCounter}" value="${itemData?.ncm || ''}" readonly style="background: #f5f5f5;"></td>
+        <td>
+            <select id="unidade-${itemCounter}" style="width: 60px;" required>
+                <option value="">-</option>
+                <option value="UN" ${itemData?.un === 'UN' ? 'selected' : ''}>UN</option>
+                <option value="MT" ${itemData?.un === 'MT' ? 'selected' : ''}>MT</option>
+                <option value="KG" ${itemData?.un === 'KG' ? 'selected' : ''}>KG</option>
+                <option value="PC" ${itemData?.un === 'PC' ? 'selected' : ''}>PC</option>
+                <option value="CX" ${itemData?.un === 'CX' ? 'selected' : ''}>CX</option>
+                <option value="LT" ${itemData?.un === 'LT' ? 'selected' : ''}>LT</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" 
+                   id="quantidade-${itemCounter}" 
+                   value="${itemData?.qtd || ''}"
+                   min="0" 
+                   step="1"
+                   onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})">
+        </td>
+        <td>
+            <input type="number" 
+                   id="valorUnitario-${itemCounter}" 
+                   value="${itemData?.valor_unitario || ''}"
+                   min="0" 
+                   step="0.0001"
+                   placeholder="0.0000"
+                   onchange="calcularValorItem(${itemCounter})">
+        </td>
+        <td><input type="text" id="valorTotal-${itemCounter}" value="${itemData?.valor_total || ''}" readonly style="background: #f5f5f5;"></td>
         <td style="text-align: center;">
-            <button type="button" onclick="removerItem(this)" class="btn-remove-item">
+            <button type="button" onclick="removeItem(${itemCounter})" class="btn-remove-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -622,65 +673,118 @@ function adicionarItem(itemData = null) {
         </td>
     `;
     
-    calcularSomaTotal();
+    calcularTotais();
 }
 
-function removerItem(button) {
-    const row = button.closest('tr');
-    row.remove();
-    calcularSomaTotal();
-}
-
-function buscarEstoque(input) {
-    const codigo = input.value.trim().toUpperCase();
-    if (!codigo) return;
-    
-    const item = estoque.find(e => 
-        String(e.codigo).toUpperCase() === codigo ||
-        String(e.codigo_fornecedor).toUpperCase() === codigo
-    );
-    
+function removeItem(id) {
+    const item = document.getElementById(`item-${id}`);
     if (item) {
-        const row = input.closest('tr');
-        row.querySelector('[data-field="descricao"]').value = item.descricao || '';
-        row.querySelector('[data-field="ncm"]').value = item.ncm || '';
-        row.querySelector('[data-field="valor_unitario"]').value = item.valor_unitario || '';
-        
-        // Verificar quantidade em estoque
-        const qtdInput = row.querySelector('[data-field="qtd"]');
-        if (qtdInput.value) {
-            const qtdSolicitada = parseFloat(qtdInput.value);
-            if (qtdSolicitada > item.quantidade) {
-                showMessage(`A quantidade em estoque para o item ${codigo} é insuficiente para atender o pedido`, 'error');
-            }
-        }
-        
-        calcularValorTotal(row.querySelector('[data-field="qtd"]'));
-    } else {
-        showMessage(`Item ${codigo} não encontrado no estoque`, 'error');
+        item.remove();
+        calcularTotais();
     }
 }
 
-function calcularValorTotal(input) {
-    const row = input.closest('tr');
-    const qtd = parseFloat(row.querySelector('[data-field="qtd"]').value) || 0;
-    const valorUnitario = parseFloat(row.querySelector('[data-field="valor_unitario"]').value) || 0;
-    const valorTotal = qtd * valorUnitario;
+function calcularValorItem(id) {
+    const quantidade = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
+    const valorUnitario = parseFloat(document.getElementById(`valorUnitario-${id}`).value) || 0;
+    const valorTotal = quantidade * valorUnitario;
     
-    row.querySelector('[data-field="valor_total"]').value = valorTotal.toFixed(4);
-    calcularSomaTotal();
+    document.getElementById(`valorTotal-${id}`).value = valorTotal.toFixed(4);
+    calcularTotais();
 }
 
-function calcularSomaTotal() {
-    const tbody = document.getElementById('itensTableBody');
-    let soma = 0;
+function calcularTotais() {
+    let valorTotal = 0;
+    let quantidadeTotal = 0;
     
-    tbody.querySelectorAll('tr').forEach(row => {
-        const valorTotal = parseFloat(row.querySelector('[data-field="valor_total"]').value) || 0;
-        soma += valorTotal;
+    document.querySelectorAll('[id^="item-"]').forEach(item => {
+        const id = item.id.replace('item-', '');
+        const qtd = parseFloat(document.getElementById(`quantidade-${id}`)?.value) || 0;
+        const valorItem = parseFloat(document.getElementById(`valorTotal-${id}`)?.value) || 0;
+        
+        quantidadeTotal += qtd;
+        valorTotal += valorItem;
     });
     
-    document.getElementById('somaValorTotal').textContent = formatarMoeda(soma);
+    // Atualizar os campos calculados
+    document.getElementById('somaValorTotal').textContent = formatarMoeda(valorTotal);
+    document.getElementById('quantidade_total').value = quantidadeTotal;
+}
+
+function buscarDadosEstoque(itemId) {
+    const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
+    const especificacaoInput = document.getElementById(`especificacao-${itemId}`);
+    const ncmInput = document.getElementById(`ncm-${itemId}`);
+    const valorUnitarioInput = document.getElementById(`valorUnitario-${itemId}`);
+    
+    if (!codigoInput || !especificacaoInput || !ncmInput) return;
+    
+    const codigo = codigoInput.value.trim();
+    
+    if (!codigo) return;
+    
+    // Buscar no array de estoque
+    const itemEstoque = estoque.find(e => 
+        String(e.codigo) === String(codigo) || 
+        String(e.codigo_fornecedor) === String(codigo)
+    );
+    
+    if (itemEstoque) {
+        // Preencher descrição e NCM
+        if (itemEstoque.descricao) {
+            especificacaoInput.value = itemEstoque.descricao;
+        }
+        if (itemEstoque.ncm) {
+            ncmInput.value = itemEstoque.ncm;
+        }
+        if (itemEstoque.valor_unitario && valorUnitarioInput) {
+            valorUnitarioInput.value = parseFloat(itemEstoque.valor_unitario).toFixed(4);
+        }
+        
+        // Recalcular se já tiver quantidade
+        calcularValorItem(itemId);
+    } else {
+        console.log('Item não encontrado no estoque:', codigo);
+    }
+}
+
+function verificarEstoque(itemId) {
+    const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
+    const quantidadeInput = document.getElementById(`quantidade-${itemId}`);
+    const warningDiv = document.getElementById(`estoque-warning-${itemId}`);
+    
+    if (!codigoInput || !quantidadeInput || !warningDiv) return;
+    
+    const codigo = codigoInput.value.trim();
+    const quantidadeSolicitada = parseFloat(quantidadeInput.value) || 0;
+    
+    if (!codigo || quantidadeSolicitada === 0) {
+        warningDiv.style.display = 'none';
+        return;
+    }
+    
+    // Buscar no array de estoque
+    const itemEstoque = estoque.find(e => 
+        String(e.codigo) === String(codigo) || 
+        String(e.codigo_fornecedor) === String(codigo)
+    );
+    
+    if (!itemEstoque) {
+        warningDiv.textContent = `⚠️ Código ${codigo} não encontrado no estoque`;
+        warningDiv.style.display = 'block';
+        showMessage(`Código ${codigo} não encontrado no estoque`, 'error');
+        return;
+    }
+    
+    const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
+    
+    if (quantidadeSolicitada > quantidadeDisponivel) {
+        warningDiv.textContent = `⚠️ Insuficiente (Disponível: ${quantidadeDisponivel})`;
+        warningDiv.style.display = 'block';
+        showMessage(`A quantidade em estoque para o item ${codigo} é insuficiente para atender o pedido`, 'error');
+    } else {
+        warningDiv.style.display = 'none';
+    }
 }
 
 // ============================================
