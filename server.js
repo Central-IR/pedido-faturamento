@@ -82,6 +82,8 @@ app.get('/api/health', (req, res) => {
 // ==============================
 app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
     try {
+        console.log('📥 GET /api/pedidos - Buscando pedidos...');
+        
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=*&order=codigo.desc`,
             {
@@ -92,20 +94,27 @@ app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
             }
         );
 
+        console.log('📊 Supabase response status:', response.status);
+
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erro Supabase:', errorText);
             throw new Error(`Supabase erro ${response.status}`);
         }
 
         const data = await response.json();
+        console.log(`✅ ${data.length} pedidos carregados`);
         res.json(data);
     } catch (error) {
-        console.error('Erro ao buscar pedidos:', error);
-        res.status(500).json({ error: 'Erro ao buscar pedidos' });
+        console.error('❌ Erro ao buscar pedidos:', error.message);
+        res.status(500).json({ error: 'Erro ao buscar pedidos', details: error.message });
     }
 });
 
 app.post('/api/pedidos', verificarAutenticacao, async (req, res) => {
     try {
+        console.log('📝 POST /api/pedidos - Criando pedido:', req.body.codigo);
+        
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos_faturamento`,
             {
@@ -122,14 +131,16 @@ app.post('/api/pedidos', verificarAutenticacao, async (req, res) => {
 
         if (!response.ok) {
             const err = await response.text();
+            console.error('❌ Erro ao criar pedido:', err);
             throw new Error(err);
         }
 
         const data = await response.json();
+        console.log('✅ Pedido criado:', data[0]?.codigo);
         res.json(data);
     } catch (error) {
-        console.error('Erro ao criar pedido:', error);
-        res.status(500).json({ error: 'Erro ao criar pedido' });
+        console.error('❌ Erro ao criar pedido:', error.message);
+        res.status(500).json({ error: 'Erro ao criar pedido', details: error.message });
     }
 });
 
