@@ -212,8 +212,11 @@ app.get('/api/estoque', verificarAutenticacao, async (req, res) => {
     }
 });
 
+// ✅ CORRIGIDO: Atualiza estoque pelo CÓDIGO (não pelo ID)
 app.patch('/api/estoque/:codigo', verificarAutenticacao, async (req, res) => {
     try {
+        console.log(`Atualizando estoque código ${req.params.codigo}:`, req.body);
+        
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/estoque?codigo=eq.${req.params.codigo}`,
             {
@@ -229,13 +232,16 @@ app.patch('/api/estoque/:codigo', verificarAutenticacao, async (req, res) => {
         );
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Erro Supabase:', errorText);
             throw new Error('Erro ao atualizar estoque');
         }
 
         const data = await response.json();
+        console.log('Estoque atualizado:', data);
         res.json(data);
     } catch (error) {
-        console.error(error);
+        console.error('Erro na rota de estoque:', error);
         res.status(500).json({ error: 'Erro ao atualizar estoque' });
     }
 });
@@ -256,4 +262,6 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log('🔒 Autenticação centralizada no Portal');
     console.log('📦 Supabase conectado com Service Role');
+    console.log('💾 Tabela: pedidos_faturamento');
+    console.log('📊 Estoque: Atualização por código');
 });
