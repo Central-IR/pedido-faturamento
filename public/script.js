@@ -520,6 +520,9 @@ function updateTable() {
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">
                         Editar
                     </button>
+                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #8B5CF6;">
+                        Etiqueta
+                    </button>
                     <button onclick="deletePedido('${pedido.id}')" class="action-btn" style="background: #EF4444;">
                         Excluir
                     </button>
@@ -1329,35 +1332,47 @@ async function toggleEmissao(id, checked) {
 }
 
 // ============================================
-// ETIQUETAS
+// GERAR ETIQUETA AUTOMÁTICA
 // ============================================
-function abrirModalEtiquetas() {
-    document.getElementById('etiquetaModal').classList.add('show');
-}
-
-function closeEtiquetaModal() {
-    document.getElementById('etiquetaModal').classList.remove('show');
-    document.getElementById('etiquetaNF').value = '';
-    document.getElementById('etiquetaVolumes').value = '';
-    document.getElementById('etiquetaDestinatario').value = '';
-    document.getElementById('etiquetaMunicipio').value = '';
-    document.getElementById('etiquetaEndereco').value = '';
-    document.getElementById('etiquetaInfo').value = '';
-}
-
-function imprimirEtiquetas() {
-    const nf = document.getElementById('etiquetaNF').value.trim();
-    const totalVolumes = parseInt(document.getElementById('etiquetaVolumes').value);
-    const destinatario = document.getElementById('etiquetaDestinatario').value.trim();
-    const municipio = document.getElementById('etiquetaMunicipio').value.trim();
-    const endereco = document.getElementById('etiquetaEndereco').value.trim();
-    const infoAdicional = document.getElementById('etiquetaInfo').value.trim();
-    
-    if (!nf || !totalVolumes || !destinatario || !municipio || !endereco) {
-        showMessage('Preencha todos os campos obrigatórios!', 'error');
+function gerarEtiqueta(id) {
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) {
+        showMessage('Pedido não encontrado!', 'error');
         return;
     }
     
+    // Verificar se tem quantidade total preenchida
+    if (!pedido.quantidade || parseInt(pedido.quantidade) === 0) {
+        showMessage('Este pedido não possui quantidade total informada!', 'error');
+        return;
+    }
+    
+    // Solicitar apenas o número da NF
+    const nf = prompt('Qual é o número da NF para este pedido?');
+    
+    if (!nf || nf.trim() === '') {
+        return; // Usuário cancelou
+    }
+    
+    // Extrair município do endereço (geralmente vem depois de vírgula)
+    let municipio = '';
+    const enderecoPartes = pedido.endereco.split(',');
+    if (enderecoPartes.length > 1) {
+        // Pegar a última parte que geralmente contém município - UF
+        municipio = enderecoPartes[enderecoPartes.length - 1].trim();
+    } else {
+        municipio = pedido.endereco;
+    }
+    
+    const totalVolumes = parseInt(pedido.quantidade);
+    const destinatario = pedido.razao_social;
+    const endereco = pedido.endereco;
+    const infoAdicional = pedido.local_entrega || '';
+    
+    imprimirEtiquetasAutomatico(nf.trim(), totalVolumes, destinatario, municipio, endereco, infoAdicional);
+}
+
+function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, endereco, infoAdicional) {
     let labelsContent = '';
     
     for (let i = 1; i <= totalVolumes; i++) {
@@ -1481,6 +1496,5 @@ function imprimirEtiquetas() {
     `);
     printWindow.document.close();
     
-    closeEtiquetaModal();
     showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
 }
