@@ -122,6 +122,47 @@ async function inicializarApp() {
         e.target.value = formatarCNPJ(e.target.value);
     });
     
+    // Converter todos os inputs de texto para maiúsculas (exceto email)
+    const fieldsToUppercase = [
+        'razaoSocial', 'inscricaoEstadual', 'endereco', 'telefone', 
+        'contato', 'documento', 'localEntrega', 'setor', 
+        'transportadora', 'valorFrete'
+    ];
+    
+    fieldsToUppercase.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', (e) => {
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.toUpperCase();
+                e.target.setSelectionRange(start, end);
+            });
+        }
+    });
+    
+    // Converter textareas e inputs da tabela de itens para maiúsculas
+    document.addEventListener('input', (e) => {
+        if (e.target.id && e.target.id.startsWith('especificacao-')) {
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            e.target.value = e.target.value.toUpperCase();
+            e.target.setSelectionRange(start, end);
+        }
+        if (e.target.id && e.target.id.startsWith('codigoEstoque-')) {
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            e.target.value = e.target.value.toUpperCase();
+            e.target.setSelectionRange(start, end);
+        }
+        if (e.target.id && e.target.id.startsWith('ncm-')) {
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            e.target.value = e.target.value.toUpperCase();
+            e.target.setSelectionRange(start, end);
+        }
+    });
+    
     setInterval(checkConnection, 30000);
 }
 
@@ -536,7 +577,7 @@ function updateTable() {
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
                 <span class="badge ${pedido.status === 'emitida' ? 'fechada' : 'aberta'}">
-                    ${pedido.status === 'emitida' ? 'Fechada' : 'Aberta'}
+                    ${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}
                 </span>
             </td>
             <td>
@@ -547,7 +588,7 @@ function updateTable() {
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">
                         Editar
                     </button>
-                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #8B5CF6;">
+                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #1E3A8A;">
                         Etiqueta
                     </button>
                     <button onclick="deletePedido('${pedido.id}')" class="action-btn" style="background: #EF4444;">
@@ -1184,7 +1225,7 @@ function viewPedido(id) {
             </div>
             <div class="form-group">
                 <label>Status</label>
-                <input type="text" value="${pedido.status === 'emitida' ? 'Emitida' : 'Pendente'}" readonly>
+                <input type="text" value="${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}" readonly>
             </div>
         </div>
     `;
