@@ -573,7 +573,7 @@ function updateTable() {
             <td><strong>${pedido.codigo}</strong></td>
             <td>${pedido.razao_social}</td>
             <td>${formatarCNPJ(pedido.cnpj)}</td>
-            <td>${pedido.vendedor || '-'}</td>
+            <td>${pedido.documento || '-'}</td>
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
                 <span class="badge ${pedido.status === 'emitida' ? 'fechada' : 'aberta'}">
