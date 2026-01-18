@@ -358,7 +358,13 @@ function preencherDadosClienteCompleto(cnpj) {
     
     document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
     document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
-    document.getElementById('vendedor').value = ultimoPedido.vendedor || '';
+    
+    // Preencher vendedor no select
+    const vendedorSelect = document.getElementById('vendedor');
+    if (vendedorSelect && ultimoPedido.vendedor) {
+        vendedorSelect.value = ultimoPedido.vendedor;
+    }
+    
     document.getElementById('peso').value = ultimoPedido.peso || '';
     document.getElementById('volumes').value = ultimoPedido.volumes || '';
     
@@ -382,7 +388,13 @@ function preencherDadosCliente(cnpj) {
     document.getElementById('setor').value = cliente.setor || '';
     document.getElementById('transportadora').value = cliente.transportadora || '';
     document.getElementById('valorFrete').value = cliente.valorFrete || '';
-    document.getElementById('vendedor').value = cliente.vendedor || '';
+    
+    // Preencher vendedor no select
+    const vendedorSelect = document.getElementById('vendedor');
+    if (vendedorSelect && cliente.vendedor) {
+        vendedorSelect.value = cliente.vendedor;
+    }
+    
     document.getElementById('peso').value = cliente.peso || '';
     document.getElementById('volumes').value = cliente.volumes || '';
     if (cliente.previsaoEntrega) {
@@ -843,13 +855,8 @@ async function savePedido() {
     };
     
     try {
-        console.log('🔍 DEBUG: editingId =', editingId, 'tipo:', typeof editingId);
-        
         const url = editingId ? `${API_URL}/pedidos/${editingId}` : `${API_URL}/pedidos`;
         const method = editingId ? 'PATCH' : 'POST';
-        
-        console.log('📡 URL:', url);
-        console.log('📡 Method:', method);
         
         const response = await fetch(url, {
             method,
@@ -938,7 +945,12 @@ async function editPedido(id) {
     document.getElementById('previsaoEntrega').value = pedido.previsao_entrega || '';
     document.getElementById('transportadora').value = pedido.transportadora || '';
     document.getElementById('valorFrete').value = pedido.valor_frete || '';
-    document.getElementById('vendedor').value = pedido.vendedor || '';
+    
+    // Preencher vendedor no select
+    const vendedorSelect = document.getElementById('vendedor');
+    if (vendedorSelect && pedido.vendedor) {
+        vendedorSelect.value = pedido.vendedor;
+    }
     
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
