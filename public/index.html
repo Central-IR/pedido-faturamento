@@ -161,7 +161,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="formTitle">Novo Pedido de Faturamento</h3>
-                <button class="close-modal" onclick="closeFormModal()">✕</button>
             </div>
             
             <div class="tabs-container">
@@ -251,7 +250,7 @@
                         </div>
                         <div class="form-group">
                             <label for="quantidade">Quantidade Total</label>
-                            <input type="text" id="quantidade" readonly>
+                            <input type="number" id="quantidade" min="0" step="1">
                         </div>
                         <div class="form-group">
                             <label for="volumes">Volumes</label>
@@ -291,7 +290,12 @@
                         </div>
                         <div class="form-group">
                             <label for="vendedor">Vendedor *</label>
-                            <input type="text" id="vendedor" required>
+                            <select id="vendedor" required>
+                                <option value="">Selecione...</option>
+                                <option value="Roberto">Roberto</option>
+                                <option value="Isaque">Isaque</option>
+                                <option value="Miguel">Miguel</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -311,7 +315,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Pedido Nº <span id="modalCodigo"></span></h3>
-                <button class="close-modal" onclick="closeInfoModal()">✕</button>
             </div>
             
             <div class="tabs-container">
@@ -339,7 +342,6 @@
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h3 class="modal-title">Gerar Etiquetas NF</h3>
-                <button class="close-modal" onclick="closeEtiquetaModal()">✕</button>
             </div>
             
             <div class="form-grid">
