@@ -341,6 +341,7 @@ function preencherDadosClienteCompleto(cnpj) {
         new Date(b.created_at) - new Date(a.created_at)
     )[0];
     
+    // ABA FATURAMENTO
     document.getElementById('cnpj').value = formatarCNPJ(cnpj);
     document.getElementById('razaoSocial').value = ultimoPedido.razao_social || '';
     document.getElementById('inscricaoEstadual').value = ultimoPedido.inscricao_estadual || '';
@@ -350,12 +351,28 @@ function preencherDadosClienteCompleto(cnpj) {
     document.getElementById('email').value = ultimoPedido.email || '';
     document.getElementById('documento').value = ultimoPedido.documento || '';
     
+    // ABA ITENS - não preenche os itens, apenas os totais
+    if (ultimoPedido.valor_total) {
+        document.getElementById('valorTotalPedido').value = ultimoPedido.valor_total;
+    }
+    if (ultimoPedido.peso) {
+        document.getElementById('peso').value = ultimoPedido.peso;
+    }
+    if (ultimoPedido.quantidade) {
+        document.getElementById('quantidade').value = ultimoPedido.quantidade;
+    }
+    if (ultimoPedido.volumes) {
+        document.getElementById('volumes').value = ultimoPedido.volumes;
+    }
+    
+    // ABA ENTREGA
     document.getElementById('localEntrega').value = ultimoPedido.local_entrega || '';
     document.getElementById('setor').value = ultimoPedido.setor || '';
     if (ultimoPedido.previsao_entrega) {
         document.getElementById('previsaoEntrega').value = ultimoPedido.previsao_entrega;
     }
     
+    // ABA TRANSPORTE
     document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
     document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
     
@@ -365,9 +382,6 @@ function preencherDadosClienteCompleto(cnpj) {
         vendedorSelect.value = ultimoPedido.vendedor;
     }
     
-    document.getElementById('peso').value = ultimoPedido.peso || '';
-    document.getElementById('volumes').value = ultimoPedido.volumes || '';
-    
     document.getElementById('cnpjSuggestions').style.display = 'none';
     showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
 }
@@ -376,6 +390,7 @@ function preencherDadosCliente(cnpj) {
     const cliente = clientesCache[cnpj];
     if (!cliente) return;
     
+    // ABA FATURAMENTO
     document.getElementById('cnpj').value = formatarCNPJ(cnpj);
     document.getElementById('razaoSocial').value = cliente.razaoSocial;
     document.getElementById('inscricaoEstadual').value = cliente.inscricaoEstadual || '';
@@ -384,8 +399,26 @@ function preencherDadosCliente(cnpj) {
     document.getElementById('contato').value = cliente.contato || '';
     document.getElementById('email').value = cliente.email || '';
     document.getElementById('documento').value = cliente.documento || '';
+    
+    // ABA ITENS - totais
+    if (cliente.peso) {
+        document.getElementById('peso').value = cliente.peso;
+    }
+    if (cliente.quantidade) {
+        document.getElementById('quantidade').value = cliente.quantidade;
+    }
+    if (cliente.volumes) {
+        document.getElementById('volumes').value = cliente.volumes;
+    }
+    
+    // ABA ENTREGA
     document.getElementById('localEntrega').value = cliente.localEntrega || '';
     document.getElementById('setor').value = cliente.setor || '';
+    if (cliente.previsaoEntrega) {
+        document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
+    }
+    
+    // ABA TRANSPORTE
     document.getElementById('transportadora').value = cliente.transportadora || '';
     document.getElementById('valorFrete').value = cliente.valorFrete || '';
     
@@ -393,12 +426,6 @@ function preencherDadosCliente(cnpj) {
     const vendedorSelect = document.getElementById('vendedor');
     if (vendedorSelect && cliente.vendedor) {
         vendedorSelect.value = cliente.vendedor;
-    }
-    
-    document.getElementById('peso').value = cliente.peso || '';
-    document.getElementById('volumes').value = cliente.volumes || '';
-    if (cliente.previsaoEntrega) {
-        document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
     }
     
     document.getElementById('cnpjSuggestions').style.display = 'none';
