@@ -744,9 +744,9 @@ tbody tr.row-fechada:hover {
 }
 
 .badge.aberta {
-    background: rgba(239, 68, 68, 0.1);
-    color: #DC2626;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    background: rgba(245, 158, 11, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .badge.fechada {
