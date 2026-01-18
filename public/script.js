@@ -50,7 +50,7 @@ function showMessage(message, type = 'success') {
     setTimeout(() => {
         div.style.animation = 'slideOut 0.3s ease forwards';
         setTimeout(() => div.remove(), 300);
-    }, 2000); // Reduzido de 3000 para 2000ms
+    }, 2000);
 }
 
 // ============================================
@@ -116,15 +116,12 @@ function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
 async function inicializarApp() {
     await checkConnection();
     
-    // Carregamento paralelo para ser mais rápido
     await Promise.all([loadPedidos(), loadEstoque()]);
     
-    // Formatar CNPJ
     document.getElementById('cnpj')?.addEventListener('input', (e) => {
         e.target.value = formatarCNPJ(e.target.value);
     });
     
-    // Verificar conexão a cada 30 segundos (menos frequente)
     setInterval(checkConnection, 30000);
 }
 
@@ -189,7 +186,6 @@ async function syncData() {
     if (btnSync) {
         btnSync.disabled = true;
         btnSync.style.opacity = '0.5';
-        // Adicionar animação de rotação
         const svg = btnSync.querySelector('svg');
         if (svg) {
             svg.style.animation = 'spin 1s linear infinite';
@@ -258,7 +254,6 @@ async function loadEstoque() {
             const items = await response.json();
             estoqueCache = {};
             items.forEach(item => {
-                // APENAS pelo código do estoque
                 estoqueCache[item.codigo.toString()] = item;
             });
             console.log(`📦 ${items.length} itens carregados do estoque`);
@@ -335,21 +330,17 @@ function buscarClientePorCNPJ(cnpj) {
 }
 
 function preencherDadosClienteCompleto(cnpj) {
-    // Buscar o último pedido com este CNPJ
     const pedidosComCNPJ = pedidos.filter(p => p.cnpj === cnpj);
     
     if (pedidosComCNPJ.length === 0) {
-        // Se não houver pedidos, usar cache básico
         preencherDadosCliente(cnpj);
         return;
     }
     
-    // Pegar o último pedido (mais recente)
     const ultimoPedido = pedidosComCNPJ.sort((a, b) => 
         new Date(b.created_at) - new Date(a.created_at)
     )[0];
     
-    // Preencher TODOS os dados de todas as abas
     document.getElementById('cnpj').value = formatarCNPJ(cnpj);
     document.getElementById('razaoSocial').value = ultimoPedido.razao_social || '';
     document.getElementById('inscricaoEstadual').value = ultimoPedido.inscricao_estadual || '';
@@ -359,14 +350,12 @@ function preencherDadosClienteCompleto(cnpj) {
     document.getElementById('email').value = ultimoPedido.email || '';
     document.getElementById('documento').value = ultimoPedido.documento || '';
     
-    // Aba Entrega
     document.getElementById('localEntrega').value = ultimoPedido.local_entrega || '';
     document.getElementById('setor').value = ultimoPedido.setor || '';
     if (ultimoPedido.previsao_entrega) {
         document.getElementById('previsaoEntrega').value = ultimoPedido.previsao_entrega;
     }
     
-    // Aba Transporte
     document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
     document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
     document.getElementById('vendedor').value = ultimoPedido.vendedor || '';
@@ -411,7 +400,6 @@ function updateDisplay() {
     const totalEmitidos = pedidos.filter(p => p.status === 'emitida').length;
     const totalPendentes = pedidos.filter(p => p.status === 'pendente').length;
     
-    // Calcular valor total
     const valorTotalGeral = pedidos.reduce((acc, p) => {
         const valor = parseMoeda(p.valor_total);
         return acc + valor;
@@ -656,19 +644,15 @@ function calcularValorItem(id) {
 
 function calcularTotais() {
     let valorTotal = 0;
-    let quantidadeTotal = 0;
     
     document.querySelectorAll('[id^="item-"]').forEach(item => {
         const id = item.id.replace('item-', '');
         const valor = parseMoeda(document.getElementById(`valorTotal-${id}`).value);
-        const qtd = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
         
         valorTotal += valor;
-        quantidadeTotal += qtd;
     });
     
     document.getElementById('valorTotalPedido').value = formatarMoeda(valorTotal);
-    document.getElementById('quantidade').value = quantidadeTotal;
 }
 
 function buscarDadosEstoque(itemId) {
@@ -682,11 +666,9 @@ function buscarDadosEstoque(itemId) {
     
     if (!codigo) return;
     
-    // Buscar APENAS pelo código do estoque
     const itemEstoque = estoqueCache[codigo];
     
     if (itemEstoque) {
-        // Preencher descrição e NCM AUTOMATICAMENTE
         especificacaoInput.value = itemEstoque.descricao;
         ncmInput.value = itemEstoque.ncm;
     }
@@ -707,7 +689,6 @@ function verificarEstoque(itemId) {
         return;
     }
     
-    // Buscar APENAS pelo código
     const itemEstoque = estoqueCache[codigo];
     
     if (!itemEstoque) {
@@ -764,7 +745,6 @@ function openFormModal() {
     document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
     resetForm();
     
-    // Gerar próximo código
     const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => parseInt(p.codigo) || 0)) : 0;
     document.getElementById('codigo').value = (maxCodigo + 1).toString();
     
@@ -795,12 +775,10 @@ function resetForm() {
 // SALVAR PEDIDO
 // ============================================
 async function savePedido() {
-    // GARANTIR que não está editando ao salvar novo
     if (document.getElementById('formTitle').textContent === 'Novo Pedido de Faturamento') {
         editingId = null;
     }
     
-    // Validações básicas
     const codigo = document.getElementById('codigo').value.trim();
     const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
     const razaoSocial = document.getElementById('razaoSocial').value.trim();
@@ -818,7 +796,6 @@ async function savePedido() {
         return;
     }
     
-    // Verificar estoque
     let estoqueInsuficiente = false;
     items.forEach(item => {
         const itemEstoque = estoqueCache[item.codigoEstoque];
@@ -943,7 +920,6 @@ async function editPedido(id) {
     currentTabIndex = 0;
     document.getElementById('formTitle').textContent = `Editar Pedido Nº ${pedido.codigo}`;
     
-    // Preencher campos
     document.getElementById('codigo').value = pedido.codigo;
     document.getElementById('cnpj').value = formatarCNPJ(pedido.cnpj);
     document.getElementById('razaoSocial').value = pedido.razao_social;
@@ -964,7 +940,6 @@ async function editPedido(id) {
     document.getElementById('valorFrete').value = pedido.valor_frete || '';
     document.getElementById('vendedor').value = pedido.vendedor || '';
     
-    // Preencher itens
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
     
@@ -1043,7 +1018,6 @@ function viewPedido(id) {
     
     document.getElementById('modalCodigo').textContent = pedido.codigo;
     
-    // Tab Faturamento
     document.getElementById('info-tab-faturamento').innerHTML = `
         <div class="form-grid">
             <div class="form-group">
@@ -1085,7 +1059,6 @@ function viewPedido(id) {
         </div>
     `;
     
-    // Tab Itens
     const items = Array.isArray(pedido.items) ? pedido.items : [];
     document.getElementById('info-tab-itens').innerHTML = `
         <table class="items-table">
@@ -1136,7 +1109,6 @@ function viewPedido(id) {
         </div>
     `;
     
-    // Tab Entrega
     document.getElementById('info-tab-entrega').innerHTML = `
         <div class="form-grid">
             <div class="form-group" style="grid-column: 1 / -1;">
@@ -1154,7 +1126,6 @@ function viewPedido(id) {
         </div>
     `;
     
-    // Tab Transporte
     document.getElementById('info-tab-transporte').innerHTML = `
         <div class="form-grid">
             <div class="form-group">
@@ -1200,7 +1171,6 @@ async function toggleEmissao(id, checked) {
     if (!pedido) return;
     
     if (checked && pedido.status === 'pendente') {
-        // Verificar disponibilidade primeiro
         const items = Array.isArray(pedido.items) ? pedido.items : [];
         let estoqueInsuficiente = false;
         
@@ -1224,15 +1194,12 @@ async function toggleEmissao(id, checked) {
             return;
         }
         
-        // Confirmar emissão
         if (!confirm(`Confirmar emissão para o pedido ${pedido.codigo}?`)) {
             document.getElementById(`check-${id}`).checked = false;
             return;
         }
         
-        // Debitar estoque
         try {
-            // Mostrar indicador de carregamento
             const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
             if (checkboxLabel) {
                 checkboxLabel.style.opacity = '0.5';
@@ -1257,7 +1224,6 @@ async function toggleEmissao(id, checked) {
                 if (!response.ok) throw new Error('Erro ao atualizar estoque');
             }
             
-            // Atualizar status do pedido
             const response = await fetch(`${API_URL}/pedidos/${id}`, {
                 method: 'PATCH',
                 headers: {
@@ -1272,10 +1238,8 @@ async function toggleEmissao(id, checked) {
             
             if (!response.ok) throw new Error('Erro ao atualizar pedido');
             
-            // Recarregar dados
             await Promise.all([loadPedidos(), loadEstoque()]);
             
-            // Restaurar checkbox
             if (checkboxLabel) {
                 checkboxLabel.style.opacity = '1';
                 checkboxLabel.style.pointerEvents = 'auto';
@@ -1288,7 +1252,6 @@ async function toggleEmissao(id, checked) {
             document.getElementById(`check-${id}`).checked = false;
         }
     } else if (!checked && pedido.status === 'emitida') {
-        // Reverter emissão
         if (!confirm(`Reverter emissão do pedido ${pedido.codigo}?\n\nAs quantidades retornarão ao estoque.`)) {
             document.getElementById(`check-${id}`).checked = true;
             return;
@@ -1297,14 +1260,12 @@ async function toggleEmissao(id, checked) {
         try {
             const items = Array.isArray(pedido.items) ? pedido.items : [];
             
-            // Mostrar indicador de carregamento
             const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
             if (checkboxLabel) {
                 checkboxLabel.style.opacity = '0.5';
                 checkboxLabel.style.pointerEvents = 'none';
             }
             
-            // Creditar estoque de volta
             for (const item of items) {
                 const itemEstoque = estoqueCache[item.codigoEstoque];
                 if (!itemEstoque) continue;
@@ -1325,7 +1286,6 @@ async function toggleEmissao(id, checked) {
                 if (!response.ok) throw new Error('Erro ao atualizar estoque');
             }
             
-            // Atualizar status do pedido
             const response = await fetch(`${API_URL}/pedidos/${id}`, {
                 method: 'PATCH',
                 headers: {
@@ -1340,10 +1300,8 @@ async function toggleEmissao(id, checked) {
             
             if (!response.ok) throw new Error('Erro ao atualizar pedido');
             
-            // Recarregar dados
             await Promise.all([loadPedidos(), loadEstoque()]);
             
-            // Restaurar checkbox
             if (checkboxLabel) {
                 checkboxLabel.style.opacity = '1';
                 checkboxLabel.style.pointerEvents = 'auto';
