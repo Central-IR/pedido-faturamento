@@ -216,29 +216,31 @@
 
                 <!-- TAB ITENS -->
                 <div class="tab-content" id="tab-itens">
-                    <button type="button" onclick="addItem()" class="btn-add-item" style="margin-bottom: 1rem;">
+                    <button type="button" onclick="addItem()" class="btn-add-item" style="margin-bottom: 1rem; background: #22C55E;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
                         Adicionar Item
                     </button>
-                    <table class="items-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;">Item</th>
-                                <th style="width: 100px;">Cód. Estoque *</th>
-                                <th style="width: 200px;">Especificação</th>
-                                <th style="width: 70px;">UN *</th>
-                                <th style="width: 80px;">Qtd *</th>
-                                <th style="width: 100px;">Valor Un. (R$)</th>
-                                <th style="width: 110px;">Valor Total</th>
-                                <th style="width: 100px;">NCM</th>
-                                <th style="width: 50px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="itemsContainer"></tbody>
-                    </table>
+                    <div class="items-table-container">
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Cód. Estoque *</th>
+                                    <th>Especificação</th>
+                                    <th>UN *</th>
+                                    <th>Qtd *</th>
+                                    <th>Valor Un. (R$)</th>
+                                    <th>Valor Total</th>
+                                    <th>NCM</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsContainer"></tbody>
+                        </table>
+                    </div>
                     <div class="form-grid" style="margin-top: 1.5rem;">
                         <div class="form-group">
                             <label for="valorTotalPedido">Valor Total do Pedido</label>
@@ -305,7 +307,7 @@
                 <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
                 <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
                 <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
-                <button type="button" id="btnSave" onclick="savePedido()" style="display: none;">Salvar Pedido</button>
+                <button type="button" id="btnSave" onclick="savePedido()" class="btn-save-green" style="display: none;">Salvar Pedido</button>
             </div>
         </div>
     </div>
@@ -315,6 +317,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Pedido Nº <span id="modalCodigo"></span></h3>
+                <button class="close-modal" onclick="closeInfoModal()">✕</button>
             </div>
             
             <div class="tabs-container">
@@ -342,6 +345,7 @@
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h3 class="modal-title">Gerar Etiquetas NF</h3>
+                <button class="close-modal" onclick="closeEtiquetaModal()">✕</button>
             </div>
             
             <div class="form-grid">
