@@ -875,8 +875,8 @@ button.small {
 }
 
 .actions-cell {
-    white-space: nowrap;
-    min-width: 300px;
+    whitespace: nowrap;
+    min-width: 380px;
 }
 
 /* ============================================
