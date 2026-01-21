@@ -753,40 +753,34 @@ function buscarDadosEstoque(itemId) {
     if (itemEstoque) {
         especificacaoInput.value = itemEstoque.descricao;
         ncmInput.value = itemEstoque.ncm;
+    } else {
+        showMessage('O item não foi encontrado', 'error');
     }
 }
 
 function verificarEstoque(itemId) {
     const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
     const quantidadeInput = document.getElementById(`quantidade-${itemId}`);
-    const warningDiv = document.getElementById(`estoque-warning-${itemId}`);
     
-    if (!codigoInput || !quantidadeInput || !warningDiv) return;
+    if (!codigoInput || !quantidadeInput) return;
     
     const codigo = codigoInput.value.trim();
     const quantidadeSolicitada = parseFloat(quantidadeInput.value) || 0;
     
     if (!codigo || quantidadeSolicitada === 0) {
-        warningDiv.style.display = 'none';
         return;
     }
     
     const itemEstoque = estoqueCache[codigo];
     
     if (!itemEstoque) {
-        warningDiv.textContent = `⚠️ Código ${codigo} não encontrado no estoque`;
-        warningDiv.style.display = 'block';
-        return;
+        return; // Não mostrar mensagem aqui, apenas em buscarDadosEstoque
     }
     
     const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
     
     if (quantidadeSolicitada > quantidadeDisponivel) {
-        warningDiv.textContent = `⚠️ Insuficiente (Disponível: ${quantidadeDisponivel})`;
-        warningDiv.style.display = 'block';
-        showMessage(`A quantidade em estoque para o item ${codigo} é insuficiente para atender o pedido`, 'error');
-    } else {
-        warningDiv.style.display = 'none';
+        showMessage(`Esta quantidade não corresponde ao estoque do item ${codigo}`, 'error');
     }
 }
 
