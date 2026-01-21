@@ -1235,9 +1235,16 @@ async function toggleEmissao(id, checked) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
     
-    if (checked && pedido.status === 'pendente') {
-        const items = Array.isArray(pedido.items) ? pedido.items : [];
-        let estoqueInsuficiente = false;
+if (checked && pedido.status === 'pendente') {
+    // Verificar se dados de faturamento estão preenchidos
+    if (!pedido.cnpj || !pedido.razao_social || !pedido.endereco) {
+        showMessage(`Não existem informações suficientes para o pedido ${pedido.codigo}`, 'error');
+        document.getElementById(`check-${id}`).checked = false;
+        return;
+    }
+    
+    const items = Array.isArray(pedido.items) ? pedido.items : [];
+    let estoqueInsuficiente = false;
         
         for (const item of items) {
             const itemEstoque = estoqueCache[item.codigoEstoque];
