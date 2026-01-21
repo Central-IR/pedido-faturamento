@@ -14,7 +14,7 @@ let estoqueCache = {};
 let editingId = null;
 let sessionToken = null;
 let currentTabIndex = 0;
-const tabs = ['tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
+const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
 // ============================================
 // FUNÇÕES AUXILIARES
@@ -862,22 +862,11 @@ async function savePedido() {
         editingId = null;
     }
     
-    const codigo = document.getElementById('codigo').value.trim();
-    const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
-    const razaoSocial = document.getElementById('razaoSocial').value.trim();
-    const endereco = document.getElementById('endereco').value.trim();
-    const vendedor = document.getElementById('vendedor').value.trim();
-    
-    if (!codigo || !cnpj || !razaoSocial || !endereco || !vendedor) {
-        showMessage('Preencha todos os campos obrigatórios!', 'error');
-        return;
-    }
-    
-    const items = getItems();
-    if (items.length === 0) {
-        showMessage('Adicione pelo menos um item ao pedido!', 'error');
-        return;
-    }
+const codigo = document.getElementById('codigo').value.trim();
+const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
+const razaoSocial = document.getElementById('razaoSocial').value.trim();
+const endereco = document.getElementById('endereco').value.trim();
+const vendedor = document.getElementById('vendedor').value.trim();
     
     let estoqueInsuficiente = false;
     items.forEach(item => {
