@@ -59,7 +59,6 @@ body {
     overflow-y: scroll;
 }
 
-/* LOADER */
 .loader {
     width: 48px;
     height: 48px;
@@ -70,14 +69,9 @@ body {
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
-/* ============================================
-   SPLASH SCREEN
-   ============================================ */
 .splash-screen {
     position: fixed;
     top: 0;
@@ -93,10 +87,7 @@ body {
 }
 
 @keyframes splashFadeOut {
-    to { 
-        opacity: 0; 
-        visibility: hidden; 
-    }
+    to { opacity: 0; visibility: hidden; }
 }
 
 .app-content {
@@ -159,7 +150,6 @@ h2 {
     color: var(--text-primary);
 }
 
-/* STATUS DE CONEXÃO */
 .connection-status {
     display: flex;
     align-items: center;
@@ -198,7 +188,6 @@ h2 {
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-/* NEW ORDER BUTTON IN HEADER */
 .btn-new-order-header {
     background: var(--btn-register);
     color: white;
@@ -223,9 +212,6 @@ h2 {
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
 }
 
-/* ============================================
-   SEARCH BAR WITH INTEGRATED FILTERS
-   ============================================ */
 .search-bar-wrapper {
     margin-bottom: 0.5rem;
 }
@@ -265,7 +251,6 @@ h2 {
     color: var(--text-secondary);
 }
 
-/* FILTERS INTEGRATED IN SEARCH BAR */
 .search-bar-filters {
     display: flex;
     align-items: center;
@@ -312,88 +297,6 @@ h2 {
     color: var(--text-secondary);
 }
 
-/* MONTH NAVIGATION INLINE */
-.month-navigation-inline {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    background: var(--input-bg);
-    padding: 0.35rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    height: 38px;
-    min-width: 160px;
-}
-
-.month-nav-arrow {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.35rem;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.month-nav-arrow:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--text-primary);
-}
-
-.month-display-inline {
-    padding: 0 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    white-space: nowrap;
-}
-
-.search-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.search-btn:hover {
-    background: var(--input-bg);
-    color: var(--text-primary);
-}
-
-/* VIEW ICONS */
-.view-icon {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.view-icon:hover {
-    background: var(--input-bg);
-    color: var(--text-primary);
-}
-
-.view-icon.active {
-    background: var(--input-bg);
-    color: var(--primary);
-}
-
-/* CALENDAR BUTTON */
 .calendar-btn {
     background: transparent;
     border: none;
@@ -411,101 +314,6 @@ h2 {
 .calendar-btn:hover {
     background: var(--input-bg);
     color: var(--primary);
-}
-
-/* CALENDAR MODAL */
-.calendar-modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: 10000;
-    align-items: center;
-    justify-content: center;
-}
-
-.calendar-modal.show {
-    display: flex;
-}
-
-.calendar-content {
-    background: var(--bg-card);
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 20px 60px var(--shadow);
-    border: 1px solid var(--border-color);
-    max-width: 400px;
-    width: 90%;
-    animation: scaleIn 0.2s ease;
-}
-
-.calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
-.calendar-header h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.calendar-year-nav {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.calendar-year-nav:hover {
-    background: var(--input-bg);
-    color: var(--text-primary);
-}
-
-.calendar-months {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-}
-
-.calendar-month {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--text-primary);
-    transition: all 0.2s ease;
-}
-
-.calendar-month:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(204, 112, 0, 0.3);
-}
-
-.calendar-month.current {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
 }
 
 .dashboard-grid {
@@ -592,52 +400,6 @@ h2 {
     font-weight: 500;
 }
 
-/* ALERTA VISUAL - ORDENS ABERTAS */
-.stat-card.has-alert {
-    position: relative;
-    animation: pulseAlert 2s ease-in-out infinite;
-    border-color: var(--alert-color) !important;
-}
-
-@keyframes pulseAlert {
-    0%, 100% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.2);
-    }
-}
-
-.pulse-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--alert-color);
-    color: white;
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-    animation: pulse 2s ease-in-out infinite;
-    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-}
-
-@keyframes pulse {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.1);
-    }
-}
-
-/* ============================================
-   TABLE
-   ============================================ */
 table {
     width: 100%;
     border-collapse: separate;
@@ -688,7 +450,6 @@ tbody tr.row-fechada:hover {
     background: rgba(34, 197, 94, 0.18) !important;
 }
 
-/* Checkbox Customizado */
 .checkbox-wrapper {
     display: inline-flex;
     align-items: center;
@@ -733,7 +494,6 @@ tbody tr.row-fechada:hover {
     font-weight: 700;
 }
 
-/* Badge de status */
 .badge {
     padding: 4px 12px;
     border-radius: 6px;
@@ -845,7 +605,6 @@ button.success, button.save, button[type="submit"], .action-btn.success {
     background: var(--btn-save);
 }
 
-/* BOTÃO SALVAR VERDE */
 .btn-save-green {
     background: #22C55E !important;
     color: white !important;
@@ -859,8 +618,8 @@ button.secondary {
     background: #6B7280;
 }
 
-button[onclick*="closeFormModal"], button[onclick*="closeInfoModal"] {
-    background: var(--btn-delete);
+button.cancel-close {
+    background: #EF4444;
 }
 
 button.small {
@@ -876,13 +635,10 @@ button.small {
 }
 
 .actions-cell {
-    whitespace: nowrap;
+    white-space: nowrap;
     min-width: 380px;
 }
 
-/* ============================================
-   FLOATING MESSAGES
-   ============================================ */
 .floating-message {
     position: fixed;
     bottom: 24px;
@@ -928,9 +684,6 @@ button.small {
     }
 }
 
-/* ============================================
-   MODAL
-   ============================================ */
 .modal-overlay {
     display: none;
     position: fixed;
@@ -994,10 +747,21 @@ button.small {
 }
 
 .close-modal {
-    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    width: 32px;
+    height: 32px;
 }
 
-/* SISTEMA DE ABAS */
+.close-modal:hover {
+    color: var(--text-primary);
+}
+
 .tabs-container {
     margin-bottom: 1.5rem;
 }
@@ -1090,7 +854,6 @@ button.small {
     line-height: 1.6;
 }
 
-/* TABELA DE ITENS */
 .items-table {
     width: 100%;
     margin: 1rem 0;
@@ -1115,7 +878,6 @@ button.small {
     white-space: nowrap;
 }
 
-/* Larguras específicas para cada coluna */
 .items-table th:nth-child(1), .items-table td:nth-child(1) { 
     width: 60px; 
     text-align: center;
@@ -1173,7 +935,6 @@ button.small {
     word-wrap: break-word;
 }
 
-/* Container com scroll para a tabela */
 .items-table-container {
     width: 100%;
     overflow-x: auto;
@@ -1189,21 +950,10 @@ button.small {
     min-width: 1300px;
 }
 
-/* WRAPPER PARA TABELA MAIOR */
-.table-wrapper-large {
-    max-height: 450px;
-    overflow-y: auto;
-    overflow-x: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    margin-bottom: 1rem;
-}
-
 .hidden {
     display: none !important;
 }
 
-/* AUTOCOMPLETE SUGGESTIONS */
 .autocomplete-suggestions {
     position: absolute;
     background: var(--bg-card);
@@ -1231,9 +981,6 @@ button.small {
     background: var(--table-hover);
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
 @media (max-width: 768px) {
     .container {
         padding: 0 1rem 5rem 1rem;
@@ -1279,11 +1026,6 @@ button.small {
         width: 100%;
     }
     
-    .month-navigation-inline {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
     .dashboard-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -1308,10 +1050,6 @@ button.small {
     .modal-content {
         padding: 1.5rem;
         width: 95%;
-    }
-    
-    .modal-content-large {
-        width: 98% !important;
     }
     
     .modal-actions {
