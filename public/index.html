@@ -155,39 +155,47 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="formTitle">Novo Pedido de Faturamento</h3>
+                <button class="close-modal" onclick="closeFormModal()">✕</button>
             </div>
             
             <div class="tabs-container">
                 <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchTab('tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn active" onclick="switchTab('tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchTab('tab-faturamento')">Faturamento</button>
                     <button class="tab-btn" onclick="switchTab('tab-itens')">Itens</button>
                     <button class="tab-btn" onclick="switchTab('tab-entrega')">Entrega</button>
                     <button class="tab-btn" onclick="switchTab('tab-transporte')">Transporte</button>
                 </div>
 
-                <!-- TAB FATURAMENTO -->
-                <div class="tab-content active" id="tab-faturamento">
+                <!-- TAB GERAL -->
+                <div class="tab-content active" id="tab-geral">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="codigo">Código *</label>
-                            <input type="text" id="codigo" required>
+                            <label for="codigo">Código</label>
+                            <input type="text" id="codigo">
                         </div>
                         <div class="form-group">
-                            <label for="cnpj">CNPJ *</label>
-                            <input type="text" id="cnpj" required oninput="buscarClientePorCNPJ(this.value)" maxlength="18">
+                            <label for="documento">Documento</label>
+                            <input type="text" id="documento">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB FATURAMENTO -->
+                <div class="tab-content" id="tab-faturamento">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="cnpj">CNPJ</label>
+                            <input type="text" id="cnpj" oninput="buscarClientePorCNPJ(this.value)" maxlength="18">
                             <div id="cnpjSuggestions" class="autocomplete-suggestions"></div>
                         </div>
                         <div class="form-group">
-                            <label for="razaoSocial">Razão Social *</label>
-                            <input type="text" id="razaoSocial" required>
+                            <label for="razaoSocial">Razão Social</label>
+                            <input type="text" id="razaoSocial">
                         </div>
                         <div class="form-group">
                             <label for="inscricaoEstadual">Inscrição Estadual</label>
                             <input type="text" id="inscricaoEstadual">
-                        </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label for="endereco">Endereço *</label>
-                            <input type="text" id="endereco" required>
                         </div>
                         <div class="form-group">
                             <label for="telefone">Telefone</label>
@@ -201,9 +209,9 @@
                             <label for="email">E-mail</label>
                             <input type="email" id="email">
                         </div>
-                        <div class="form-group">
-                            <label for="documento">Documento</label>
-                            <input type="text" id="documento">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="endereco">Endereço</label>
+                            <input type="text" id="endereco">
                         </div>
                     </div>
                 </div>
@@ -222,10 +230,10 @@
                             <thead>
                                 <tr>
                                     <th>Item</th>
-                                    <th>Cód. Estoque *</th>
+                                    <th>Cód. Estoque</th>
                                     <th>Especificação</th>
-                                    <th>UN *</th>
-                                    <th>Qtd *</th>
+                                    <th>UN</th>
+                                    <th>Qtd</th>
                                     <th>Valor Un. (R$)</th>
                                     <th>Valor Total</th>
                                     <th>NCM</th>
@@ -278,15 +286,19 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="transportadora">Transportadora</label>
-                            <input type="text" id="transportadora">
+                            <select id="transportadora">
+                                <option value="">Selecione...</option>
+                                <option value="TNT MERCÚRIO">TNT MERCÚRIO</option>
+                                <option value="BRASPRESS">BRASPRESS</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="valorFrete">Valor do Frete (R$)</label>
                             <input type="text" id="valorFrete">
                         </div>
                         <div class="form-group">
-                            <label for="vendedor">Vendedor *</label>
-                            <select id="vendedor" required>
+                            <label for="vendedor">Vendedor</label>
+                            <select id="vendedor">
                                 <option value="">Selecione...</option>
                                 <option value="Roberto">Roberto</option>
                                 <option value="Isaque">Isaque</option>
@@ -300,7 +312,7 @@
             <div class="modal-actions">
                 <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
                 <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
-                <button type="button" onclick="closeFormModal()" class="secondary">Cancelar</button>
+                <button type="button" onclick="closeFormModal()" class="cancel-close">Cancelar</button>
                 <button type="button" id="btnSave" onclick="savePedido()" class="btn-save-green" style="display: none;">Salvar Pedido</button>
             </div>
         </div>
@@ -316,20 +328,22 @@
             
             <div class="tabs-container">
                 <div class="tabs-nav">
-                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-faturamento')">Faturamento</button>
                     <button class="tab-btn" onclick="switchInfoTab('info-tab-itens')">Itens</button>
                     <button class="tab-btn" onclick="switchInfoTab('info-tab-entrega')">Entrega</button>
                     <button class="tab-btn" onclick="switchInfoTab('info-tab-transporte')">Transporte</button>
                 </div>
 
-                <div class="tab-content active" id="info-tab-faturamento"></div>
+                <div class="tab-content active" id="info-tab-geral"></div>
+                <div class="tab-content" id="info-tab-faturamento"></div>
                 <div class="tab-content" id="info-tab-itens"></div>
                 <div class="tab-content" id="info-tab-entrega"></div>
                 <div class="tab-content" id="info-tab-transporte"></div>
             </div>
 
             <div class="modal-actions">
-                <button type="button" onclick="closeInfoModal()" class="secondary">Fechar</button>
+                <button type="button" onclick="closeInfoModal()" class="cancel-close">Fechar</button>
             </div>
         </div>
     </div>
