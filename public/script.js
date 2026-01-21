@@ -667,7 +667,6 @@ function addItem() {
                    onblur="verificarEstoque(${itemCounter})"
                    onchange="buscarDadosEstoque(${itemCounter})"
                    required>
-            <div id="estoque-warning-${itemCounter}" style="color: var(--alert-color); font-size: 0.75rem; margin-top: 4px; display: none;"></div>
         </td>
         <td><textarea id="especificacao-${itemCounter}" rows="2"></textarea></td>
         <td>
