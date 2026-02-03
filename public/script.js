@@ -9,10 +9,11 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 let pedidos = [];
 let isOnline = false;
 let itemCounter = 0;
-let clientesCache = {};
-let estoqueCache = {};
 let editingId = null;
 let sessionToken = null;
+let currentUser = null;
+let currentMonth = new Date();
+let calendarYear = new Date().getFullYear();
 let currentTabIndex = 0;
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
@@ -53,6 +54,12 @@ function showMessage(message, type = 'success') {
     }, 2000);
 }
 
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR');
+}
+
 // ============================================
 // INICIALIZAÇÃO E AUTENTICAÇÃO
 // ============================================
@@ -77,131 +84,151 @@ function verificarAutenticacao() {
         return;
     }
 
-    inicializarApp();
+    obterDadosUsuario();
+}
+
+async function obterDadosUsuario() {
+    try {
+        const response = await fetch(`${PORTAL_URL}/api/verify-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
+
+        if (!response.ok) {
+            mostrarTelaAcessoNegado('Sessão inválida');
+            return;
+        }
+
+        const data = await response.json();
+        if (data.valid && data.session) {
+            currentUser = data.session;
+            inicializarApp();
+        } else {
+            mostrarTelaAcessoNegado('Sessão inválida');
+        }
+    } catch (error) {
+        console.error('Erro ao obter dados do usuário:', error);
+        mostrarTelaAcessoNegado('Erro ao validar sessão');
+    }
 }
 
 function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
     document.body.innerHTML = `
-        <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            text-align: center;
-            padding: 2rem;
-        ">
-            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">
-                ${mensagem}
-            </h1>
-            <p style="color: var(--text-secondary); margin-bottom: 2rem;">
-                Somente usuários autenticados podem acessar esta área.
-            </p>
-            <a href="${PORTAL_URL}" style="
-                display: inline-block;
-                background: var(--btn-register);
-                color: white;
-                padding: 14px 32px;
-                border-radius: 8px;
-                text-decoration: none;
-                font-weight: 600;
-                text-transform: uppercase;
-            ">IR PARA O PORTAL</a>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: var(--bg-primary); color: var(--text-primary); text-align: center; padding: 2rem;">
+            <h1 style="font-size: 2.2rem; margin-bottom: 1rem;">${mensagem}</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Somente usuários autenticados podem acessar esta área.</p>
+            <a href="${PORTAL_URL}" style="display: inline-block; background: var(--btn-register); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">Ir para o Portal</a>
         </div>
     `;
 }
 
-async function inicializarApp() {
-    await checkConnection();
+function inicializarApp() {
+    console.log('📱 Inicializando app...');
+    console.log('👤 Usuário:', currentUser);
     
-    await Promise.all([loadPedidos(), loadEstoque()]);
+    checkServerStatus();
+    loadPedidos();
+    updateMonthDisplay();
+    renderCalendar();
     
-    document.getElementById('cnpj')?.addEventListener('input', (e) => {
-        e.target.value = formatarCNPJ(e.target.value);
-    });
+    setInterval(checkServerStatus, 30000);
+    setInterval(loadPedidos, 60000);
     
-    const fieldsToUppercase = [
-        'razaoSocial', 'inscricaoEstadual', 'endereco', 'telefone', 
-        'contato', 'documento', 'localEntrega', 'setor', 
-        'transportadora', 'valorFrete'
-    ];
+    document.getElementById('pedidoForm').addEventListener('submit', savePedido);
     
-    fieldsToUppercase.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field) {
-            field.addEventListener('input', (e) => {
-                const start = e.target.selectionStart;
-                const end = e.target.selectionEnd;
-                e.target.value = e.target.value.toUpperCase();
-                e.target.setSelectionRange(start, end);
-            });
-        }
-    });
-    
-    document.addEventListener('input', (e) => {
-        if (e.target.id && e.target.id.startsWith('especificacao-')) {
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
-        }
-        if (e.target.id && e.target.id.startsWith('codigoEstoque-')) {
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
-        }
-        if (e.target.id && e.target.id.startsWith('ncm-')) {
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
-        }
-    });
-    
-    setInterval(checkConnection, 30000);
+    setTimeout(() => {
+        document.getElementById('splashScreen').style.display = 'none';
+    }, 800);
 }
 
 // ============================================
-// CONEXÃO COM A API
+// NAVEGAÇÃO DE MESES
 // ============================================
-async function checkConnection() {
+function changeMonth(direction) {
+    currentMonth.setMonth(currentMonth.getMonth() + direction);
+    updateMonthDisplay();
+    updateDisplay();
+}
+
+function updateMonthDisplay() {
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const monthName = months[currentMonth.getMonth()];
+    const year = currentMonth.getFullYear();
+    document.getElementById('currentMonth').textContent = `${monthName} ${year}`;
+}
+
+// ============================================
+// CALENDÁRIO
+// ============================================
+function toggleCalendar() {
+    const modal = document.getElementById('calendarModal');
+    if (modal.style.display === 'none') {
+        modal.style.display = 'flex';
+        calendarYear = currentMonth.getFullYear();
+        renderCalendar();
+    } else {
+        modal.style.display = 'none';
+    }
+}
+
+function changeCalendarYear(direction) {
+    calendarYear += direction;
+    document.getElementById('calendarYear').textContent = calendarYear;
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    
+    document.getElementById('calendarYear').textContent = calendarYear;
+    
+    const container = document.getElementById('calendarMonths');
+    container.innerHTML = months.map((month, index) => {
+        const isCurrentMonth = index === currentMonth.getMonth() && 
+                              calendarYear === currentMonth.getFullYear();
+        return `
+            <button class="month-btn ${isCurrentMonth ? 'active' : ''}" 
+                    onclick="selectMonth(${index})">
+                ${month}
+            </button>
+        `;
+    }).join('');
+}
+
+function selectMonth(monthIndex) {
+    currentMonth = new Date(calendarYear, monthIndex, 1);
+    toggleCalendar();
+    updateMonthDisplay();
+    updateDisplay();
+}
+
+// ============================================
+// SERVIDOR E DADOS
+// ============================================
+async function checkServerStatus() {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
         const response = await fetch(`${API_URL}/pedidos`, {
-            method: 'HEAD',
-            headers: { 'X-Session-Token': sessionToken },
-            signal: controller.signal
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Session-Token': sessionToken
+            }
         });
-        
-        clearTimeout(timeoutId);
 
+        isOnline = response.ok;
+        updateConnectionStatus();
+        
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
-            return false;
-        }
-
-        const wasOffline = !isOnline;
-        isOnline = response.ok;
-        
-        if (wasOffline && isOnline) {
-            console.log('✅ Servidor ONLINE');
-            await loadPedidos();
-        } else if (!wasOffline && !isOnline) {
-            console.log('❌ Servidor OFFLINE');
+            mostrarTelaAcessoNegado('Sua sessão expirou');
         }
         
-        updateConnectionStatus();
         return isOnline;
     } catch (error) {
-        if (isOnline) {
-            console.log('❌ Erro de conexão:', error.message);
-        }
+        console.error('❌ Erro ao verificar servidor:', error);
         isOnline = false;
         updateConnectionStatus();
         return false;
@@ -209,1321 +236,463 @@ async function checkConnection() {
 }
 
 function updateConnectionStatus() {
-    const status = document.getElementById('connectionStatus');
-    if (status) {
-        status.className = isOnline ? 'connection-status online' : 'connection-status offline';
+    const statusElem = document.getElementById('connectionStatus');
+    if (!statusElem) return;
+    
+    if (isOnline) {
+        statusElem.classList.remove('offline');
+        statusElem.classList.add('online');
+    } else {
+        statusElem.classList.remove('online');
+        statusElem.classList.add('offline');
     }
 }
 
-async function syncData() {
-    if (!isOnline) {
-        showMessage('Você está offline. Não é possível sincronizar.', 'error');
-        return;
-    }
-    
-    const btnSync = document.getElementById('btnSync');
-    if (btnSync) {
-        btnSync.disabled = true;
-        btnSync.style.opacity = '0.5';
-        const svg = btnSync.querySelector('svg');
-        if (svg) {
-            svg.style.animation = 'spin 1s linear infinite';
-        }
-    }
-    
-    try {
-        await Promise.all([loadPedidos(), loadEstoque()]);
-        showMessage('Dados sincronizados', 'success');
-    } catch (error) {
-        showMessage('Erro ao sincronizar', 'error');
-    } finally {
-        if (btnSync) {
-            btnSync.disabled = false;
-            btnSync.style.opacity = '1';
-            const svg = btnSync.querySelector('svg');
-            if (svg) {
-                svg.style.animation = '';
-            }
-        }
-    }
-}
-
-// ============================================
-// CARREGAR PEDIDOS
-// ============================================
 async function loadPedidos() {
-    if (!isOnline) return;
     try {
         const response = await fetch(`${API_URL}/pedidos`, {
-            headers: { 'X-Session-Token': sessionToken }
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Session-Token': sessionToken
+            }
         });
 
-        if (response.status === 401) {
-            sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
-            return;
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
 
-        if (response.ok) {
-            pedidos = await response.json();
-            atualizarCacheClientes(pedidos);
-            updateDisplay();
-        }
+        const data = await response.json();
+        pedidos = data;
+        isOnline = true;
+        updateConnectionStatus();
+        updateDisplay();
+        
+        console.log(`[${new Date().toLocaleTimeString()}] ${pedidos.length} pedidos carregados`);
     } catch (error) {
-        console.error('Erro ao carregar pedidos:', error);
+        console.error('❌ Erro ao carregar pedidos:', error);
+        isOnline = false;
+        updateConnectionStatus();
     }
 }
 
-// ============================================
-// CARREGAR ESTOQUE
-// ============================================
-async function loadEstoque() {
-    try {
-        const response = await fetch(`${API_URL}/estoque`, {
-            headers: { 'X-Session-Token': sessionToken }
-        });
-
-        if (response.status === 401) {
-            sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
-            return;
-        }
-
-        if (response.ok) {
-            const items = await response.json();
-            estoqueCache = {};
-            items.forEach(item => {
-                estoqueCache[item.codigo.toString()] = item;
-            });
-            console.log(`📦 ${items.length} itens carregados do estoque`);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar estoque:', error);
-    }
-}
-
-// ============================================
-// CACHE DE CLIENTES
-// ============================================
-function atualizarCacheClientes(pedidos) {
-    clientesCache = {};
-    pedidos.forEach(pedido => {
-        const cnpj = pedido.cnpj?.trim();
-        if (cnpj && !clientesCache[cnpj]) {
-            clientesCache[cnpj] = {
-                razaoSocial: pedido.razao_social,
-                inscricaoEstadual: pedido.inscricao_estadual,
-                endereco: pedido.endereco,
-                telefone: pedido.telefone,
-                contato: pedido.contato,
-                email: pedido.email || '',
-                documento: pedido.documento,
-                localEntrega: pedido.local_entrega,
-                setor: pedido.setor,
-                transportadora: pedido.transportadora,
-                valorFrete: pedido.valor_frete,
-                vendedor: pedido.vendedor,
-                peso: pedido.peso,
-                quantidade: pedido.quantidade,
-                volumes: pedido.volumes,
-                previsaoEntrega: pedido.previsao_entrega
-            };
-        }
-    });
-    console.log(`👥 ${Object.keys(clientesCache).length} clientes em cache`);
-}
-
-function buscarClientePorCNPJ(cnpj) {
-    cnpj = cnpj.replace(/\D/g, '');
-    
-    const suggestionsDiv = document.getElementById('cnpjSuggestions');
-    if (!suggestionsDiv) return;
-    
-    if (cnpj.length < 3) {
-        suggestionsDiv.innerHTML = '';
-        suggestionsDiv.style.display = 'none';
-        return;
-    }
-    
-    const matches = Object.keys(clientesCache).filter(key => 
-        key.replace(/\D/g, '').includes(cnpj)
-    );
-    
-    if (matches.length === 0) {
-        suggestionsDiv.innerHTML = '';
-        suggestionsDiv.style.display = 'none';
-        return;
-    }
-    
-    suggestionsDiv.innerHTML = '';
-    matches.forEach(cnpjKey => {
-        const cliente = clientesCache[cnpjKey];
-        const div = document.createElement('div');
-        div.className = 'autocomplete-item';
-        div.innerHTML = `<strong>${formatarCNPJ(cnpjKey)}</strong><br>${cliente.razaoSocial}`;
-        div.onclick = () => preencherDadosClienteCompleto(cnpjKey);
-        suggestionsDiv.appendChild(div);
-    });
-    
-    suggestionsDiv.style.display = 'block';
-}
-
-function preencherDadosClienteCompleto(cnpj) {
-    const pedidosComCNPJ = pedidos.filter(p => p.cnpj === cnpj);
-    
-    if (pedidosComCNPJ.length === 0) {
-        preencherDadosCliente(cnpj);
-        return;
-    }
-    
-    const ultimoPedido = pedidosComCNPJ.sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-    )[0];
-    
-    document.getElementById('cnpj').value = formatarCNPJ(cnpj);
-    document.getElementById('razaoSocial').value = ultimoPedido.razao_social || '';
-    document.getElementById('inscricaoEstadual').value = ultimoPedido.inscricao_estadual || '';
-    document.getElementById('endereco').value = ultimoPedido.endereco || '';
-    document.getElementById('telefone').value = ultimoPedido.telefone || '';
-    document.getElementById('contato').value = ultimoPedido.contato || '';
-    document.getElementById('email').value = ultimoPedido.email || '';
-    document.getElementById('documento').value = ultimoPedido.documento || '';
-    
-    if (ultimoPedido.valor_total) {
-        document.getElementById('valorTotalPedido').value = ultimoPedido.valor_total;
-    }
-    if (ultimoPedido.peso) {
-        document.getElementById('peso').value = ultimoPedido.peso;
-    }
-    if (ultimoPedido.quantidade) {
-        document.getElementById('quantidade').value = ultimoPedido.quantidade;
-    }
-    if (ultimoPedido.volumes) {
-        document.getElementById('volumes').value = ultimoPedido.volumes;
-    }
-    
-    document.getElementById('localEntrega').value = ultimoPedido.local_entrega || '';
-    document.getElementById('setor').value = ultimoPedido.setor || '';
-    if (ultimoPedido.previsao_entrega) {
-        document.getElementById('previsaoEntrega').value = ultimoPedido.previsao_entrega;
-    }
-    
-    document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
-    document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
-    
-    const vendedorSelect = document.getElementById('vendedor');
-    if (vendedorSelect && ultimoPedido.vendedor) {
-        vendedorSelect.value = ultimoPedido.vendedor;
-    }
-    
-    document.getElementById('cnpjSuggestions').style.display = 'none';
-    showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
-}
-
-function preencherDadosCliente(cnpj) {
-    const cliente = clientesCache[cnpj];
-    if (!cliente) return;
-    
-    document.getElementById('cnpj').value = formatarCNPJ(cnpj);
-    document.getElementById('razaoSocial').value = cliente.razaoSocial;
-    document.getElementById('inscricaoEstadual').value = cliente.inscricaoEstadual || '';
-    document.getElementById('endereco').value = cliente.endereco;
-    document.getElementById('telefone').value = cliente.telefone || '';
-    document.getElementById('contato').value = cliente.contato || '';
-    document.getElementById('email').value = cliente.email || '';
-    document.getElementById('documento').value = cliente.documento || '';
-    
-    if (cliente.peso) {
-        document.getElementById('peso').value = cliente.peso;
-    }
-    if (cliente.quantidade) {
-        document.getElementById('quantidade').value = cliente.quantidade;
-    }
-    if (cliente.volumes) {
-        document.getElementById('volumes').value = cliente.volumes;
-    }
-    
-    document.getElementById('localEntrega').value = cliente.localEntrega || '';
-    document.getElementById('setor').value = cliente.setor || '';
-    if (cliente.previsaoEntrega) {
-        document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
-    }
-    
-    document.getElementById('transportadora').value = cliente.transportadora || '';
-    document.getElementById('valorFrete').value = cliente.valorFrete || '';
-    
-    const vendedorSelect = document.getElementById('vendedor');
-    if (vendedorSelect && cliente.vendedor) {
-        vendedorSelect.value = cliente.vendedor;
-    }
-    
-    document.getElementById('cnpjSuggestions').style.display = 'none';
-    showMessage('Dados do cliente preenchidos automaticamente!', 'success');
-}
-
-// ============================================
-// ATUALIZAR DISPLAY
-// ============================================
 function updateDisplay() {
-    const totalEmitidos = pedidos.filter(p => p.status === 'emitida').length;
-    const totalPendentes = pedidos.filter(p => p.status === 'pendente').length;
+    updateDashboard();
+    renderPedidos();
+}
+
+function updateDashboard() {
+    const mesSelecionado = currentMonth.getMonth();
+    const anoSelecionado = currentMonth.getFullYear();
     
-    const valorTotalGeral = pedidos.reduce((acc, p) => {
-        const valor = parseMoeda(p.valor_total);
-        return acc + valor;
+    // Filtrar pedidos do mês selecionado
+    const pedidosDoMes = pedidos.filter(p => {
+        if (!p.data_pedido) return false;
+        const dataPedido = new Date(p.data_pedido);
+        return dataPedido.getMonth() === mesSelecionado && 
+               dataPedido.getFullYear() === anoSelecionado;
+    });
+    
+    const total = pedidosDoMes.length;
+    const emitidos = pedidosDoMes.filter(p => p.status === 'EMITIDO').length;
+    const pendentes = pedidosDoMes.filter(p => p.status === 'PENDENTE').length;
+    
+    const valorTotal = pedidosDoMes.reduce((sum, p) => {
+        const valor = parseFloat(p.valor_total) || 0;
+        return sum + valor;
     }, 0);
     
-    document.getElementById('totalPedidos').textContent = pedidos.length;
-    document.getElementById('totalEmitidos').textContent = totalEmitidos;
-    document.getElementById('totalPendentes').textContent = totalPendentes;
-    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotalGeral);
-    
-    updateVendedoresFilter();
-    updateTable();
+    document.getElementById('totalPedidos').textContent = total;
+    document.getElementById('totalEmitidos').textContent = emitidos;
+    document.getElementById('totalPendentes').textContent = pendentes;
+    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotal);
 }
 
-// ============================================
-// ATUALIZAR FILTRO DE VENDEDORES
-// ============================================
-function updateVendedoresFilter() {
-    const vendedores = new Set();
-    pedidos.forEach(p => {
-        if (p.vendedor?.trim()) {
-            vendedores.add(p.vendedor.trim());
-        }
+function renderPedidos() {
+    const tbody = document.getElementById('pedidosTable');
+    if (!tbody) return;
+    
+    const mesSelecionado = currentMonth.getMonth();
+    const anoSelecionado = currentMonth.getFullYear();
+    
+    // Filtrar e ordenar pedidos do mês
+    let pedidosFiltrados = pedidos.filter(p => {
+        if (!p.data_pedido) return false;
+        const dataPedido = new Date(p.data_pedido);
+        return dataPedido.getMonth() === mesSelecionado && 
+               dataPedido.getFullYear() === anoSelecionado;
     });
-
-    const select = document.getElementById('filterVendedor');
-    if (select) {
-        const currentValue = select.value;
-        select.innerHTML = '<option value="">Responsável</option>';
-        Array.from(vendedores).sort().forEach(v => {
-            const option = document.createElement('option');
-            option.value = v;
-            option.textContent = v;
-            select.appendChild(option);
-        });
-        select.value = currentValue;
-    }
-}
-
-// ============================================
-// FILTRAR PEDIDOS
-// ============================================
-function filterPedidos() {
-    updateTable();
-}
-
-// ============================================
-// ATUALIZAR TABELA
-// ============================================
-function updateTable() {
-    const container = document.getElementById('pedidosContainer');
-    let filtered = [...pedidos];
     
-    const search = document.getElementById('search').value.toLowerCase();
-    const filterVendedor = document.getElementById('filterVendedor').value;
-    const filterStatus = document.getElementById('filterStatus').value;
+    // Aplicar filtros de pesquisa
+    const search = document.getElementById('search')?.value.toLowerCase() || '';
+    const filterStatus = document.getElementById('filterStatus')?.value || '';
     
     if (search) {
-        filtered = filtered.filter(p => 
-            p.codigo?.toString().includes(search) ||
-            (p.cnpj || '').toLowerCase().includes(search) ||
-            (p.razao_social || '').toLowerCase().includes(search)
+        pedidosFiltrados = pedidosFiltrados.filter(p =>
+            (p.codigo || '').toLowerCase().includes(search) ||
+            (p.cliente || '').toLowerCase().includes(search) ||
+            (p.cnpj || '').includes(search)
         );
     }
     
-    if (filterVendedor) {
-        filtered = filtered.filter(p => (p.vendedor || '') === filterVendedor);
-    }
-    
     if (filterStatus) {
-        filtered = filtered.filter(p => p.status === filterStatus);
+        pedidosFiltrados = pedidosFiltrados.filter(p => p.status === filterStatus);
     }
     
-    if (filtered.length === 0) {
-        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado</td></tr>';
+    // Ordenar por número do pedido (crescente)
+    pedidosFiltrados.sort((a, b) => {
+        const codigoA = parseInt(a.codigo) || 0;
+        const codigoB = parseInt(b.codigo) || 0;
+        return codigoA - codigoB;
+    });
+    
+    if (pedidosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Nenhum pedido encontrado</td></tr>';
         return;
     }
     
-    container.innerHTML = filtered.map(pedido => `
-        <tr class="${pedido.status === 'emitida' ? 'row-fechada' : ''}">
-            <td style="text-align: center;">
-                <div class="checkbox-wrapper">
-                    <input type="checkbox" 
-                           class="styled-checkbox" 
-                           id="check-${pedido.id}"
-                           ${pedido.status === 'emitida' ? 'checked' : ''}
-                           onchange="toggleEmissao('${pedido.id}', this.checked)">
-                    <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
-                </div>
-            </td>
+    tbody.innerHTML = pedidosFiltrados.map(pedido => `
+        <tr>
             <td><strong>${pedido.codigo}</strong></td>
-            <td>${pedido.razao_social}</td>
-            <td>${formatarCNPJ(pedido.cnpj)}</td>
-            <td>${pedido.documento || '-'}</td>
-            <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
+            <td>${pedido.cliente}</td>
             <td>
-                <span class="badge ${pedido.status === 'emitida' ? 'fechada' : 'aberta'}">
-                    ${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}
+                <span class="badge badge-${pedido.status === 'EMITIDO' ? 'success' : 'warning'}">
+                    ${pedido.status}
                 </span>
             </td>
+            <td><strong>${formatarMoeda(pedido.valor_total || 0)}</strong></td>
+            <td>${pedido.responsavel || '-'}</td>
             <td>
-                <div class="actions">
-                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #F59E0B;">
-                        Ver
-                    </button>
-                    <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">
-                        Editar
-                    </button>
-                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #1E3A8A;">
-                        Etiqueta
-                    </button>
-                    <button onclick="deletePedido('${pedido.id}')" class="action-btn" style="background: #EF4444;">
-                        Excluir
-                    </button>
-                </div>
+                <button onclick="editPedido('${pedido.id}')" class="btn-action btn-edit" title="Editar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
             </td>
         </tr>
     `).join('');
 }
 
-// ============================================
-// NAVEGAÇÃO ENTRE ABAS
-// ============================================
-function switchTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    
-    document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
-    
-    currentTabIndex = tabs.indexOf(tabId);
-    updateNavigationButtons();
+function filterPedidos() {
+    renderPedidos();
 }
 
-function nextTab() {
-    if (currentTabIndex < tabs.length - 1) {
-        currentTabIndex++;
-        activateTab(currentTabIndex);
+// ============================================
+// FORMULÁRIO - NAVEGAÇÃO
+// ============================================
+function showFormulario() {
+    document.getElementById('listView').style.display = 'none';
+    document.getElementById('formView').style.display = 'block';
+    
+    resetForm();
+    editingId = null;
+    currentTabIndex = 0;
+    switchTab(0);
+    
+    // Definir responsável automaticamente
+    if (currentUser && currentUser.username) {
+        document.getElementById('responsavel').value = currentUser.username;
     }
+    
+    // Definir data do pedido automaticamente
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('data_pedido').value = hoje;
+    
+    document.getElementById('formTitle').textContent = 'Novo Pedido';
+    document.getElementById('btnConfirmarEmissao').style.display = 'none';
+    document.getElementById('estoqueWarning').style.display = 'none';
 }
 
-function previousTab() {
-    if (currentTabIndex > 0) {
-        currentTabIndex--;
-        activateTab(currentTabIndex);
-    }
+function hideFormulario() {
+    document.getElementById('listView').style.display = 'block';
+    document.getElementById('formView').style.display = 'none';
+    resetForm();
+    editingId = null;
 }
 
-function activateTab(index) {
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+function switchTab(index) {
+    currentTabIndex = index;
     
-    const tabId = tabs[index];
-    document.getElementById(tabId).classList.add('active');
-    document.querySelectorAll('.tab-btn')[index].classList.add('active');
+    // Atualizar botões
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+        if (i === index) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
     
-    updateNavigationButtons();
+    // Atualizar conteúdo
+    document.querySelectorAll('.tab-content').forEach((content, i) => {
+        if (i === index) {
+            content.classList.add('active');
+        } else {
+            content.classList.remove('active');
+        }
+    });
 }
 
-function updateNavigationButtons() {
-    const btnPrevious = document.getElementById('btnPrevious');
-    const btnNext = document.getElementById('btnNext');
-    const btnSave = document.getElementById('btnSave');
-    
-    btnPrevious.style.display = currentTabIndex === 0 ? 'none' : 'inline-block';
-    btnNext.style.display = currentTabIndex === tabs.length - 1 ? 'none' : 'inline-block';
-    btnSave.style.display = currentTabIndex === tabs.length - 1 ? 'inline-block' : 'none';
+function resetForm() {
+    document.getElementById('pedidoForm').reset();
+    document.getElementById('itensContainer').innerHTML = '';
+    itemCounter = 0;
 }
 
 // ============================================
-// GERENCIAMENTO DE ITENS
+// ITENS DO PEDIDO
 // ============================================
 function addItem() {
     itemCounter++;
-    const container = document.getElementById('itemsContainer');
-    const tr = document.createElement('tr');
-    tr.id = `item-${itemCounter}`;
-    tr.innerHTML = `
-        <td><input type="text" value="${itemCounter}" readonly style="text-align: center; width: 50px;"></td>
-        <td>
-            <input type="text" 
-                   id="codigoEstoque-${itemCounter}" 
-                   class="codigo-estoque"
-                   placeholder="CÓDIGO"
-                   onblur="verificarEstoque(${itemCounter})"
-                   onchange="buscarDadosEstoque(${itemCounter})">
-        </td>
-        <td><textarea id="especificacao-${itemCounter}" rows="2"></textarea></td>
-        <td>
-            <select id="unidade-${itemCounter}">
-                <option value="">-</option>
-                <option value="UN">UN</option>
-                <option value="MT">MT</option>
-                <option value="KG">KG</option>
-                <option value="PC">PC</option>
-                <option value="CX">CX</option>
-                <option value="LT">LT</option>
-            </select>
-        </td>
-        <td>
-            <input type="number" 
-                   id="quantidade-${itemCounter}" 
-                   min="0" 
-                   step="1"
-                   onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})">
-        </td>
-        <td>
-            <input type="number" 
-                   id="valorUnitario-${itemCounter}" 
-                   min="0" 
-                   step="0.01"
-                   placeholder="0.00"
-                   onchange="calcularValorItem(${itemCounter})">
-        </td>
-        <td><input type="text" id="valorTotal-${itemCounter}" readonly></td>
-        <td><input type="text" id="ncm-${itemCounter}"></td>
-        <td>
-            <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
-                ✕
-            </button>
-        </td>
+    const container = document.getElementById('itensContainer');
+    
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'item-row';
+    itemDiv.id = `item-${itemCounter}`;
+    itemDiv.innerHTML = `
+        <div class="item-fields">
+            <div class="form-group form-group-small">
+                <label>Código *</label>
+                <input type="text" name="item_codigo[]" required>
+            </div>
+            <div class="form-group">
+                <label>Descrição *</label>
+                <input type="text" name="item_descricao[]" required>
+            </div>
+            <div class="form-group form-group-small">
+                <label>Quantidade *</label>
+                <input type="number" name="item_quantidade[]" min="1" value="1" required onchange="calcularTotalItem(${itemCounter})">
+            </div>
+            <div class="form-group form-group-small">
+                <label>Valor Unit. *</label>
+                <input type="text" name="item_valor[]" required onchange="calcularTotalItem(${itemCounter})">
+            </div>
+            <div class="form-group form-group-small">
+                <label>Total</label>
+                <input type="text" name="item_total[]" readonly>
+            </div>
+        </div>
+        <button type="button" onclick="removeItem(${itemCounter})" class="btn-remove-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
     `;
-    container.appendChild(tr);
+    
+    container.appendChild(itemDiv);
 }
 
 function removeItem(id) {
     const item = document.getElementById(`item-${id}`);
-    if (item) {
-        item.remove();
-        calcularTotais();
-    }
+    if (item) item.remove();
 }
 
-function calcularValorItem(id) {
-    const quantidade = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
-    const valorUnitario = parseFloat(document.getElementById(`valorUnitario-${id}`).value) || 0;
-    const valorTotal = quantidade * valorUnitario;
+function calcularTotalItem(id) {
+    const item = document.getElementById(`item-${id}`);
+    if (!item) return;
     
-    document.getElementById(`valorTotal-${id}`).value = formatarMoeda(valorTotal);
-    calcularTotais();
+    const qtd = parseFloat(item.querySelector('[name="item_quantidade[]"]').value) || 0;
+    const valor = parseMoeda(item.querySelector('[name="item_valor[]"]').value);
+    const total = qtd * valor;
+    
+    item.querySelector('[name="item_total[]"]').value = formatarMoeda(total);
 }
 
-function calcularTotais() {
+// ============================================
+// SALVAR E EDITAR PEDIDO
+// ============================================
+async function savePedido(e) {
+    e.preventDefault();
+    
+    // Coletar dados do formulário
+    const formData = {
+        codigo: document.getElementById('codigo').value,
+        cnpj: document.getElementById('cnpj').value,
+        cliente: document.getElementById('cliente').value.toUpperCase(),
+        vendedor: document.getElementById('vendedor').value.toUpperCase(),
+        responsavel: document.getElementById('responsavel').value,
+        data_pedido: document.getElementById('data_pedido').value,
+        documento: document.getElementById('documento').value,
+        inscricao_estadual: document.getElementById('inscricao_estadual').value,
+        email_nfe: document.getElementById('email_nfe').value,
+        tipo_pagamento: document.getElementById('tipo_pagamento').value,
+        condicao_pagamento: document.getElementById('condicao_pagamento').value,
+        endereco_entrega: document.getElementById('endereco_entrega').value.toUpperCase(),
+        cep_entrega: document.getElementById('cep_entrega').value,
+        cidade_entrega: document.getElementById('cidade_entrega').value.toUpperCase(),
+        uf_entrega: document.getElementById('uf_entrega').value.toUpperCase(),
+        modalidade_frete: document.getElementById('modalidade_frete').value,
+        transportadora: document.getElementById('transportadora').value.toUpperCase(),
+        observacoes: document.getElementById('observacoes').value.toUpperCase(),
+        status: 'PENDENTE'
+    };
+    
+    // Coletar itens
+    const itens = [];
+    const itemRows = document.querySelectorAll('.item-row');
     let valorTotal = 0;
     
-    document.querySelectorAll('[id^="item-"]').forEach(item => {
-        const id = item.id.replace('item-', '');
-        const valor = parseMoeda(document.getElementById(`valorTotal-${id}`).value);
-        
-        valorTotal += valor;
+    itemRows.forEach(row => {
+        const item = {
+            codigo: row.querySelector('[name="item_codigo[]"]').value,
+            descricao: row.querySelector('[name="item_descricao[]"]').value.toUpperCase(),
+            quantidade: parseFloat(row.querySelector('[name="item_quantidade[]"]').value),
+            valor_unitario: parseMoeda(row.querySelector('[name="item_valor[]"]').value),
+            total: parseMoeda(row.querySelector('[name="item_total[]"]').value)
+        };
+        itens.push(item);
+        valorTotal += item.total;
     });
     
-    document.getElementById('valorTotalPedido').value = formatarMoeda(valorTotal);
-}
-
-function buscarDadosEstoque(itemId) {
-    const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
-    const especificacaoInput = document.getElementById(`especificacao-${itemId}`);
-    const ncmInput = document.getElementById(`ncm-${itemId}`);
-    
-    if (!codigoInput || !especificacaoInput || !ncmInput) return;
-    
-    const codigo = codigoInput.value.trim();
-    
-    if (!codigo) return;
-    
-    const itemEstoque = estoqueCache[codigo];
-    
-    if (itemEstoque) {
-        especificacaoInput.value = itemEstoque.descricao;
-        ncmInput.value = itemEstoque.ncm;
-    } else {
-        showMessage('O item não foi encontrado', 'error');
-    }
-}
-
-function verificarEstoque(itemId) {
-    const codigoInput = document.getElementById(`codigoEstoque-${itemId}`);
-    const quantidadeInput = document.getElementById(`quantidade-${itemId}`);
-    
-    if (!codigoInput || !quantidadeInput) return;
-    
-    const codigo = codigoInput.value.trim();
-    const quantidadeSolicitada = parseFloat(quantidadeInput.value) || 0;
-    
-    if (!codigo || quantidadeSolicitada === 0) {
-        return;
-    }
-    
-    const itemEstoque = estoqueCache[codigo];
-    
-    if (!itemEstoque) {
-        return;
-    }
-    
-    const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
-    
-    if (quantidadeSolicitada > quantidadeDisponivel) {
-        showMessage(`Esta quantidade não corresponde ao estoque do item ${codigo}`, 'error');
-    }
-}
-
-function getItems() {
-    const items = [];
-    document.querySelectorAll('[id^="item-"]').forEach(item => {
-        const id = item.id.replace('item-', '');
-        const codigoEstoque = document.getElementById(`codigoEstoque-${id}`).value.trim();
-        const especificacao = document.getElementById(`especificacao-${id}`).value.trim();
-        const unidade = document.getElementById(`unidade-${id}`).value;
-        const quantidade = parseFloat(document.getElementById(`quantidade-${id}`).value) || 0;
-        const valorUnitario = parseFloat(document.getElementById(`valorUnitario-${id}`).value) || 0;
-        const valorTotal = document.getElementById(`valorTotal-${id}`).value;
-        const ncm = document.getElementById(`ncm-${id}`).value.trim();
-        
-        if (codigoEstoque && unidade && quantidade > 0) {
-            items.push({
-                item: items.length + 1,
-                codigoEstoque,
-                especificacao,
-                unidade,
-                quantidade,
-                valorUnitario,
-                valorTotal,
-                ncm
-            });
-        }
-    });
-    return items;
-}
-
-// ============================================
-// MODAL DE FORMULÁRIO
-// ============================================
-function openFormModal() {
-    editingId = null;
-    currentTabIndex = 0;
-    document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
-    resetForm();
-    
-    const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => parseInt(p.codigo) || 0)) : 0;
-    document.getElementById('codigo').value = (maxCodigo + 1).toString();
-    
-    activateTab(0);
-    document.getElementById('formModal').classList.add('show');
-}
-
-function closeFormModal() {
-    const isEditing = editingId !== null;
-    document.getElementById('formModal').classList.remove('show');
-    resetForm();
-    
-    if (isEditing) {
-        showMessage('Atualização cancelada', 'error');
-    } else {
-        showMessage('Pedido cancelado', 'error');
-    }
-}
-
-function resetForm() {
-    document.querySelectorAll('#formModal input:not([type="checkbox"]), #formModal textarea, #formModal select').forEach(input => {
-        if (input.type === 'checkbox') {
-            input.checked = false;
-        } else {
-            input.value = '';
-        }
-    });
-    
-    document.getElementById('itemsContainer').innerHTML = '';
-    itemCounter = 0;
-    addItem();
-}
-
-// ============================================
-// SALVAR PEDIDO
-// ============================================
-async function savePedido() {
-    if (document.getElementById('formTitle').textContent === 'Novo Pedido de Faturamento') {
-        editingId = null;
-    }
-    
-    const codigo = document.getElementById('codigo').value.trim();
-    const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
-    const razaoSocial = document.getElementById('razaoSocial').value.trim();
-    const endereco = document.getElementById('endereco').value.trim();
-    const vendedor = document.getElementById('vendedor').value.trim();
-    const items = getItems();
-    
-    const pedido = {
-        codigo,
-        cnpj,
-        razao_social: razaoSocial,
-        inscricao_estadual: document.getElementById('inscricaoEstadual').value.trim(),
-        endereco,
-        bairro: document.getElementById('bairro')?.value.trim() || '',
-        municipio: document.getElementById('municipio')?.value.trim() || '',
-        uf: document.getElementById('uf')?.value.trim() || '',
-        numero: document.getElementById('numero')?.value.trim() || '',
-        telefone: document.getElementById('telefone').value.trim(),
-        contato: document.getElementById('contato').value.trim(),
-        email: document.getElementById('email').value.trim().toLowerCase(),
-        documento: document.getElementById('documento').value.trim(),
-        items,
-        valor_total: document.getElementById('valorTotalPedido').value,
-        peso: document.getElementById('peso').value,
-        quantidade: document.getElementById('quantidade').value,
-        volumes: document.getElementById('volumes').value,
-        local_entrega: document.getElementById('localEntrega').value.trim(),
-        setor: document.getElementById('setor').value.trim(),
-        previsao_entrega: document.getElementById('previsaoEntrega').value || null,
-        transportadora: document.getElementById('transportadora').value.trim(),
-        valor_frete: document.getElementById('valorFrete').value,
-        vendedor,
-        status: 'pendente'
-    };
+    formData.itens = JSON.stringify(itens);
+    formData.valor_total = valorTotal;
     
     try {
         const url = editingId ? `${API_URL}/pedidos/${editingId}` : `${API_URL}/pedidos`;
-        const method = editingId ? 'PATCH' : 'POST';
+        const method = editingId ? 'PUT' : 'POST';
         
         const response = await fetch(url, {
-            method,
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'X-Session-Token': sessionToken
             },
-            body: JSON.stringify(pedido)
+            body: JSON.stringify(formData)
         });
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Erro do servidor:', errorText);
             throw new Error('Erro ao salvar pedido');
         }
         
-        await loadPedidos();
-        closeFormModal();
-        
-        if (editingId) {
-            showMessage(`Pedido ${codigo} atualizado`, 'success');
-        } else {
-            showMessage(`Pedido ${codigo} registrado`, 'success');
-        }
+        showMessage(editingId ? 'Pedido atualizado!' : 'Pedido criado!', 'success');
+        hideFormulario();
+        loadPedidos();
     } catch (error) {
-        console.error('Erro ao salvar:', error);
-        showMessage('Erro ao salvar pedido!', 'error');
+        console.error('Erro:', error);
+        showMessage('Erro ao salvar pedido', 'error');
     }
 }
 
-// ============================================
-// DELETAR PEDIDO
-// ============================================
-async function deletePedido(id) {
-    const pedido = pedidos.find(p => p.id === id);
-    if (!pedido) return;
-    
-    if (!confirm(`Tem certeza que deseja excluir o pedido ${pedido.codigo}?\n\nEsta ação não pode ser desfeita.`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_URL}/pedidos/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'X-Session-Token': sessionToken
-            }
-        });
-        
-        if (!response.ok) throw new Error('Erro ao excluir pedido');
-        
-        await loadPedidos();
-        showMessage(`Pedido ${pedido.codigo} excluído`, 'error');
-    } catch (error) {
-        console.error('Erro ao excluir:', error);
-        showMessage('Erro ao excluir pedido!', 'error');
-    }
-}
-
-// ============================================
-// EDITAR PEDIDO
-// ============================================
 async function editPedido(id) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
     
     editingId = id;
-    currentTabIndex = 0;
-    document.getElementById('formTitle').textContent = `Editar Pedido Nº ${pedido.codigo}`;
+    showFormulario();
     
-    document.getElementById('codigo').value = pedido.codigo;
+    document.getElementById('formTitle').textContent = 'Editar Pedido';
+    
+    // Preencher campos
+    document.getElementById('codigo').value = pedido.codigo || '';
+    document.getElementById('cnpj').value = pedido.cnpj || '';
+    document.getElementById('cliente').value = pedido.cliente || '';
+    document.getElementById('vendedor').value = pedido.vendedor || '';
+    document.getElementById('responsavel').value = pedido.responsavel || '';
+    document.getElementById('data_pedido').value = pedido.data_pedido || '';
     document.getElementById('documento').value = pedido.documento || '';
-    document.getElementById('cnpj').value = formatarCNPJ(pedido.cnpj);
-    document.getElementById('razaoSocial').value = pedido.razao_social;
-    document.getElementById('inscricaoEstadual').value = pedido.inscricao_estadual || '';
-    document.getElementById('endereco').value = pedido.endereco;
-    document.getElementById('telefone').value = pedido.telefone || '';
-    document.getElementById('contato').value = pedido.contato || '';
-    document.getElementById('email').value = pedido.email || '';
-    document.getElementById('valorTotalPedido').value = pedido.valor_total;
-    document.getElementById('peso').value = pedido.peso || '';
-    document.getElementById('quantidade').value = pedido.quantidade || '';
-    document.getElementById('volumes').value = pedido.volumes || '';
-    document.getElementById('localEntrega').value = pedido.local_entrega || '';
-    document.getElementById('setor').value = pedido.setor || '';
-    document.getElementById('previsaoEntrega').value = pedido.previsao_entrega || '';
+    document.getElementById('inscricao_estadual').value = pedido.inscricao_estadual || '';
+    document.getElementById('email_nfe').value = pedido.email_nfe || '';
+    document.getElementById('tipo_pagamento').value = pedido.tipo_pagamento || '';
+    document.getElementById('condicao_pagamento').value = pedido.condicao_pagamento || '';
+    document.getElementById('endereco_entrega').value = pedido.endereco_entrega || '';
+    document.getElementById('cep_entrega').value = pedido.cep_entrega || '';
+    document.getElementById('cidade_entrega').value = pedido.cidade_entrega || '';
+    document.getElementById('uf_entrega').value = pedido.uf_entrega || '';
+    document.getElementById('modalidade_frete').value = pedido.modalidade_frete || '';
     document.getElementById('transportadora').value = pedido.transportadora || '';
-    document.getElementById('valorFrete').value = pedido.valor_frete || '';
+    document.getElementById('observacoes').value = pedido.observacoes || '';
     
-    const vendedorSelect = document.getElementById('vendedor');
-    if (vendedorSelect && pedido.vendedor) {
-        vendedorSelect.value = pedido.vendedor;
-    }
-    
-    document.getElementById('itemsContainer').innerHTML = '';
-    itemCounter = 0;
-    
-    const items = Array.isArray(pedido.items) ? pedido.items : [];
-    if (items.length === 0) {
-        addItem();
-    } else {
-        items.forEach((item, index) => {
-            itemCounter++;
-            const container = document.getElementById('itemsContainer');
-            const tr = document.createElement('tr');
-            tr.id = `item-${itemCounter}`;
-            tr.innerHTML = `
-                <td><input type="text" value="${index + 1}" readonly style="text-align: center; width: 50px;"></td>
-                <td>
-                    <input type="text" 
-                           id="codigoEstoque-${itemCounter}" 
-                           value="${item.codigoEstoque || ''}"
-                           class="codigo-estoque"
-                           onblur="verificarEstoque(${itemCounter})"
-                           onchange="buscarDadosEstoque(${itemCounter})">
-                </td>
-                <td><textarea id="especificacao-${itemCounter}" rows="2">${item.especificacao || ''}</textarea></td>
-                <td>
-                    <select id="unidade-${itemCounter}">
-                        <option value="">-</option>
-                        <option value="UN" ${item.unidade === 'UN' ? 'selected' : ''}>UN</option>
-                        <option value="MT" ${item.unidade === 'MT' ? 'selected' : ''}>MT</option>
-                        <option value="KG" ${item.unidade === 'KG' ? 'selected' : ''}>KG</option>
-                        <option value="PC" ${item.unidade === 'PC' ? 'selected' : ''}>PC</option>
-                        <option value="CX" ${item.unidade === 'CX' ? 'selected' : ''}>CX</option>
-                        <option value="LT" ${item.unidade === 'LT' ? 'selected' : ''}>LT</option>
-                    </select>
-                </td>
-                <td>
-                    <input type="number" 
-                           id="quantidade-${itemCounter}" 
-                           value="${item.quantidade || 0}"
-                           min="0" 
-                           step="1"
-                           onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})">
-                </td>
-                <td>
-                    <input type="number" 
-                           id="valorUnitario-${itemCounter}" 
-                           value="${item.valorUnitario || 0}"
-                           min="0" 
-                           step="0.01"
-                           onchange="calcularValorItem(${itemCounter})">
-                </td>
-                <td><input type="text" id="valorTotal-${itemCounter}" value="${item.valorTotal || 'R$ 0,00'}" readonly></td>
-                <td><input type="text" id="ncm-${itemCounter}" value="${item.ncm || ''}"></td>
-                <td>
-                    <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
-                        ✕
-                    </button>
-                </td>
-            `;
-            container.appendChild(tr);
+    // Carregar itens
+    if (pedido.itens) {
+        const itens = JSON.parse(pedido.itens);
+        itens.forEach(item => {
+            addItem();
+            const lastItem = document.querySelector('.item-row:last-child');
+            if (lastItem) {
+                lastItem.querySelector('[name="item_codigo[]"]').value = item.codigo || '';
+                lastItem.querySelector('[name="item_descricao[]"]').value = item.descricao || '';
+                lastItem.querySelector('[name="item_quantidade[]"]').value = item.quantidade || 1;
+                lastItem.querySelector('[name="item_valor[]"]').value = formatarMoeda(item.valor_unitario || 0);
+                lastItem.querySelector('[name="item_total[]"]').value = formatarMoeda(item.total || 0);
+            }
         });
     }
     
-    activateTab(0);
-    document.getElementById('formModal').classList.add('show');
-}
-
-// ============================================
-// VISUALIZAR PEDIDO
-// ============================================
-function viewPedido(id) {
-    const pedido = pedidos.find(p => p.id === id);
-    if (!pedido) return;
+    // Verificar se pode confirmar emissão
+    verificarEstoque();
     
-    document.getElementById('modalCodigo').textContent = pedido.codigo;
-    
-    document.getElementById('info-tab-geral').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group">
-                <label>Código</label>
-                <input type="text" value="${pedido.codigo}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Documento</label>
-                <input type="text" value="${pedido.documento || '-'}" readonly>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('info-tab-faturamento').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group">
-                <label>CNPJ</label>
-                <input type="text" value="${formatarCNPJ(pedido.cnpj)}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Razão Social</label>
-                <input type="text" value="${pedido.razao_social}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Inscrição Estadual</label>
-                <input type="text" value="${pedido.inscricao_estadual || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Telefone</label>
-                <input type="text" value="${pedido.telefone || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Contato</label>
-                <input type="text" value="${pedido.contato || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>E-mail</label>
-                <input type="text" value="${pedido.email || '-'}" readonly>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Endereço</label>
-                <input type="text" value="${pedido.endereco}" readonly>
-            </div>
-        </div>
-    `;
-    
-    const items = Array.isArray(pedido.items) ? pedido.items : [];
-    document.getElementById('info-tab-itens').innerHTML = `
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Cód. Estoque</th>
-                    <th>Especificação</th>
-                    <th>UN</th>
-                    <th>Quantidade</th>
-                    <th>Valor Unitário</th>
-                    <th>Valor Total</th>
-                    <th>NCM</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${items.map((item, index) => `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${item.codigoEstoque || '-'}</td>
-                        <td>${item.especificacao || '-'}</td>
-                        <td>${item.unidade || '-'}</td>
-                        <td>${item.quantidade || 0}</td>
-                        <td>${formatarMoeda(item.valorUnitario || 0)}</td>
-                        <td>${item.valorTotal || 'R$ 0,00'}</td>
-                        <td>${item.ncm || '-'}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
-        <div class="form-grid" style="margin-top: 1.5rem;">
-            <div class="form-group">
-                <label>Valor Total</label>
-                <input type="text" value="${pedido.valor_total || 'R$ 0,00'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Peso (kg)</label>
-                <input type="text" value="${pedido.peso || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Quantidade Total</label>
-                <input type="text" value="${pedido.quantidade || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Volumes</label>
-                <input type="text" value="${pedido.volumes || '-'}" readonly>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('info-tab-entrega').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Local de Entrega</label>
-                <textarea readonly rows="3">${pedido.local_entrega || '-'}</textarea>
-            </div>
-            <div class="form-group">
-                <label>Setor</label>
-                <input type="text" value="${pedido.setor || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Previsão de Entrega</label>
-                <input type="text" value="${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}" readonly>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('info-tab-transporte').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group">
-                <label>Transportadora</label>
-                <input type="text" value="${pedido.transportadora || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Valor do Frete</label>
-                <input type="text" value="${pedido.valor_frete || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Vendedor</label>
-                <input type="text" value="${pedido.vendedor || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <input type="text" value="${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}" readonly>
-            </div>
-        </div>
-    `;
-    
-    switchInfoTab('info-tab-geral');
-    document.getElementById('infoModal').classList.add('show');
-}
-
-function closeInfoModal() {
-    document.getElementById('infoModal').classList.remove('show');
-}
-
-function switchInfoTab(tabId) {
-    document.querySelectorAll('#infoModal .tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('#infoModal .tab-btn').forEach(btn => btn.classList.remove('active'));
-    
-    document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
-}
-
-// ============================================
-// TOGGLE EMISSÃO (DEBITAR ESTOQUE)
-// ============================================
-async function toggleEmissao(id, checked) {
-    const pedido = pedidos.find(p => p.id === id);
-    if (!pedido) return;
-    
-    if (checked && pedido.status === 'pendente') {
-        if (!pedido.cnpj || !pedido.razao_social || !pedido.endereco) {
-            showMessage(`Não existem informações suficientes para o pedido ${pedido.codigo}`, 'error');
-            document.getElementById(`check-${id}`).checked = false;
-            return;
-        }
-        
-        const items = Array.isArray(pedido.items) ? pedido.items : [];
-        let estoqueInsuficiente = false;
-        
-        for (const item of items) {
-            const itemEstoque = estoqueCache[item.codigoEstoque];
-            if (!itemEstoque) {
-                showMessage(`Código ${item.codigoEstoque} não encontrado no estoque`, 'error');
-                document.getElementById(`check-${id}`).checked = false;
-                return;
-            }
-            
-            const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
-            if (item.quantidade > quantidadeDisponivel) {
-                showMessage(`A quantidade em estoque para o item ${item.codigoEstoque} é insuficiente para atender o pedido`, 'error');
-                estoqueInsuficiente = true;
-            }
-        }
-        
-        if (estoqueInsuficiente) {
-            document.getElementById(`check-${id}`).checked = false;
-            return;
-        }
-        
-        if (!confirm(`Confirmar emissão para o pedido ${pedido.codigo}?`)) {
-            document.getElementById(`check-${id}`).checked = false;
-            return;
-        }
-        
-        try {
-            const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '0.5';
-                checkboxLabel.style.pointerEvents = 'none';
-            }
-            
-            for (const item of items) {
-                const itemEstoque = estoqueCache[item.codigoEstoque];
-                const novaQuantidade = parseFloat(itemEstoque.quantidade) - item.quantidade;
-                
-                const response = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
-                    },
-                    body: JSON.stringify({
-                        quantidade: novaQuantidade
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Erro ao atualizar estoque');
-            }
-            
-            const response = await fetch(`${API_URL}/pedidos/${id}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': sessionToken
-                },
-                body: JSON.stringify({
-                    status: 'emitida',
-                    data_emissao: new Date().toISOString()
-                })
-            });
-            
-            if (!response.ok) throw new Error('Erro ao atualizar pedido');
-            
-            await Promise.all([loadPedidos(), loadEstoque()]);
-            
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '1';
-                checkboxLabel.style.pointerEvents = 'auto';
-            }
-            
-            showMessage(`Pedido de Faturamento ${pedido.codigo} Emitido`, 'success');
-        } catch (error) {
-            console.error('Erro ao emitir:', error);
-            showMessage('Erro ao emitir pedido', 'error');
-            document.getElementById(`check-${id}`).checked = false;
-        }
-    } else if (!checked && pedido.status === 'emitida') {
-        if (!confirm(`Reverter emissão do pedido ${pedido.codigo}?\n\nAs quantidades retornarão ao estoque.`)) {
-            document.getElementById(`check-${id}`).checked = true;
-            return;
-        }
-        
-        try {
-            const items = Array.isArray(pedido.items) ? pedido.items : [];
-            
-            const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '0.5';
-                checkboxLabel.style.pointerEvents = 'none';
-            }
-            
-            for (const item of items) {
-                const itemEstoque = estoqueCache[item.codigoEstoque];
-                if (!itemEstoque) continue;
-                
-                const novaQuantidade = parseFloat(itemEstoque.quantidade) + item.quantidade;
-                
-                const response = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
-                    },
-                    body: JSON.stringify({
-                        quantidade: novaQuantidade
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Erro ao atualizar estoque');
-            }
-            
-            const response = await fetch(`${API_URL}/pedidos/${id}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': sessionToken
-                },
-                body: JSON.stringify({
-                    status: 'pendente',
-                    data_emissao: null
-                })
-            });
-            
-            if (!response.ok) throw new Error('Erro ao atualizar pedido');
-            
-            await Promise.all([loadPedidos(), loadEstoque()]);
-            
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '1';
-                checkboxLabel.style.pointerEvents = 'auto';
-            }
-            
-            showMessage(`Emissão do pedido ${pedido.codigo} revertida!`, 'success');
-        } catch (error) {
-            console.error('Erro ao reverter:', error);
-            showMessage('Erro ao reverter emissão!', 'error');
-            document.getElementById(`check-${id}`).checked = true;
-        }
+    // Mostrar botão de confirmar emissão se status for PENDENTE
+    if (pedido.status === 'PENDENTE') {
+        document.getElementById('btnConfirmarEmissao').style.display = 'inline-block';
     }
 }
 
 // ============================================
-// GERAR ETIQUETA AUTOMÁTICA
+// CONFIRMAR EMISSÃO
 // ============================================
-function gerarEtiqueta(id) {
-    const pedido = pedidos.find(p => p.id === id);
-    if (!pedido) {
-        showMessage('Pedido não encontrado!', 'error');
-        return;
-    }
+function verificarEstoque() {
+    const itemRows = document.querySelectorAll('.item-row');
+    let todosPreenchidos = true;
     
-    if (!pedido.quantidade || parseInt(pedido.quantidade) === 0) {
-        showMessage('Este pedido não possui quantidade total informada!', 'error');
-        return;
-    }
+    itemRows.forEach(row => {
+        const codigo = row.querySelector('[name="item_codigo[]"]').value.trim();
+        if (!codigo) {
+            todosPreenchidos = false;
+        }
+    });
     
-    const nf = prompt('Qual é o número da NF para este pedido?');
-    
-    if (!nf || nf.trim() === '') {
-        return;
-    }
-    
-    let municipio = '';
-    const enderecoPartes = pedido.endereco.split(',');
-    if (enderecoPartes.length > 1) {
-        municipio = enderecoPartes[enderecoPartes.length - 1].trim();
+    const warning = document.getElementById('estoqueWarning');
+    if (!todosPreenchidos) {
+        warning.style.display = 'block';
+        return false;
     } else {
-        municipio = pedido.endereco;
+        warning.style.display = 'none';
+        return true;
     }
-    
-    const totalVolumes = parseInt(pedido.quantidade);
-    const destinatario = pedido.razao_social;
-    const endereco = pedido.endereco;
-    const infoAdicional = pedido.local_entrega || '';
-    
-    imprimirEtiquetasAutomatico(nf.trim(), totalVolumes, destinatario, municipio, endereco, infoAdicional);
 }
 
-function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, endereco, infoAdicional) {
-    let labelsContent = '';
-    
-    for (let i = 1; i <= totalVolumes; i++) {
-        labelsContent += `
-            <div class='label-container'>
-                <div class='logo-container'>
-                    <img src='ETIQUETA.png' alt='Logo' style='max-width: 100px; max-height: 100px; margin-right: 15px;'>
-                    <div>
-                        <div class='header'>I.R COMÉRCIO E <br>MATERIAIS ELÉTRICOS LTDA</div>
-                        <div class='cnpj'>CNPJ: 33.149.502/0001-38</div>
-                    </div>
-                </div>
-                <div class='nf-volume-container'>
-                    <div class='nf-volume'>NF: ${nf}</div>
-                    <div class='volume'>VOLUME: ${i}/${totalVolumes}</div>
-                </div>
-                <hr>
-                <div class='section-title'>DESTINATÁRIO:</div>
-                <div class='section'>${destinatario}</div>
-                <div class='section'>${municipio}</div>
-                <div class='section'>${endereco}</div>
-                ${infoAdicional ? `<div class='section-title additional-info'>LOCAL DE ENTREGA:</div><div class='section'>${infoAdicional}</div>` : ""}
-            </div>
-        `;
+async function confirmarEmissao() {
+    if (!editingId) {
+        showMessage('Salve o pedido antes de confirmar a emissão', 'error');
+        return;
     }
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-        <head>
-            <title>Etiquetas NF ${nf}</title>
-            <style>
-                @page {
-                    size: 100mm 150mm;
-                    margin: 2mm;
-                }
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    font-size: 12px;
-                    text-align: left;
-                    margin: 0;
-                    padding: 0;
-                }
-                .label-container {
-                    width: 94mm;
-                    height: 144mm;
-                    padding: 2mm;
-                    box-sizing: border-box;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: flex-start;
-                    overflow: hidden;
-                    page-break-after: always;
-                }
-                .logo-container {
-                    display: flex;
-                    align-items: center;
-                    margin-bottom: 10px;
-                }
-                .logo-container img {
-                    max-width: 100px;
-                    max-height: 100px;
-                    margin-right: 15px;
-                }
-                .header, .cnpj, .section-title {
-                    font-weight: bold;
-                    margin-bottom: 5px;
-                }
-                .header {
-                    font-size: 14px;
-                    line-height: 1.2;
-                }
-                .cnpj {
-                    font-size: 12px;
-                }
-                .nf-volume-container {
-                    text-align: center;
-                    border: 1px solid black;
-                    padding: 5px;
-                    margin: 10px 0;
-                }
-                .nf-volume {
-                    font-size: 30px;
-                    font-weight: bold;
-                    margin-bottom: 2px;
-                }
-                .volume {
-                    font-size: 20px;
-                    font-weight: bold;
-                    margin-bottom: 5px;
-                }
-                .section {
-                    line-height: 1.2;
-                    word-wrap: break-word;
-                    margin-top: 2px;
-                }
-                .additional-info {
-                    margin-top: 10px;
-                }
-                hr {
-                    border: none;
-                    border-top: 1px solid #000;
-                    margin: 10px 0;
-                }
-            </style>
-        </head>
-        <body>
-            ${labelsContent}
-            <script>
-                window.onload = function() {
-                    setTimeout(function() {
-                        window.print();
-                        window.onafterprint = function() { 
-                            window.close(); 
-                        };
-                    }, 500);
-                };
-            <\/script>
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
+    if (!verificarEstoque()) {
+        showMessage('Preencha todos os códigos do estoque antes de confirmar', 'error');
+        return;
+    }
     
-    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
+    if (!confirm('Confirmar emissão deste pedido?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/pedidos/${editingId}/confirmar-emissao`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Token': sessionToken
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao confirmar emissão');
+        }
+        
+        showMessage('Emissão confirmada com sucesso!', 'success');
+        hideFormulario();
+        loadPedidos();
+    } catch (error) {
+        console.error('Erro:', error);
+        showMessage('Erro ao confirmar emissão', 'error');
+    }
 }
+
+// Adicionar event listener para verificar estoque ao mudar de aba
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('pedidoForm');
+    if (form) {
+        form.addEventListener('change', verificarEstoque);
+    }
+});
