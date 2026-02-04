@@ -22,37 +22,12 @@
                         <span class="status-dot"></span>
                     </div>
                 </div>
-                <div class="header-actions">
-                    <button onclick="toggleCalendar()" class="btn-calendar">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </button>
-                    <button onclick="showFormulario()" class="btn-new-order-header">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Novo Pedido
-                    </button>
-                </div>
-            </div>
-
-            <!-- Month Navigation -->
-            <div class="month-navigation">
-                <button onclick="changeMonth(-1)" class="month-nav-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6"></polyline>
+                <button onclick="openFormModal()" class="btn-new-order-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                </button>
-                <h2 id="currentMonth">Janeiro 2026</h2>
-                <button onclick="changeMonth(1)" class="month-nav-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
+                    Novo Pedido
                 </button>
             </div>
 
@@ -105,243 +80,287 @@
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-info" id="valorTotal">R$ 0,00</div>
-                        <div class="stat-label">Valor Total</div>
+                        <div class="stat-label">Total</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Main Content: Lista ou Formulário -->
-            <div id="mainContent">
-                <!-- LISTA DE PEDIDOS -->
-                <div id="listView" class="list-view">
-                    <!-- Search Bar -->
-                    <div class="search-bar-wrapper">
-                        <div class="search-bar">
-                            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <path d="m21 21-4.35-4.35"></path>
+            <!-- Search Bar with Filters -->
+            <div class="search-bar-wrapper">
+                <div class="search-bar">
+                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input type="text" id="search" placeholder="Pesquisar" oninput="filterPedidos()">
+                    
+                    <!-- Filters integrated in search bar -->
+                    <div class="search-bar-filters">
+                        <div class="filter-dropdown-inline">
+                            <select id="filterVendedor" onchange="filterPedidos()">
+                                <option value="">Responsável</option>
+                            </select>
+                            <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
-                            <input type="text" id="search" placeholder="Pesquisar por Nº Pedido, Cliente ou CNPJ..." oninput="filterPedidos()">
-                            
-                            <div class="search-bar-filters">
-                                <div class="filter-dropdown-inline">
-                                    <select id="filterStatus" onchange="filterPedidos()">
-                                        <option value="">Todos os Status</option>
-                                        <option value="PENDENTE">Pendente</option>
-                                        <option value="EMITIDO">Emitido</option>
-                                    </select>
-                                </div>
-                            </div>
+                        </div>
+                        <div class="filter-dropdown-inline">
+                            <select id="filterStatus" onchange="filterPedidos()">
+                                <option value="">Todos os Status</option>
+                                <option value="pendente">Pendente</option>
+                                <option value="emitida">Emitida</option>
+                            </select>
+                            <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
                         </div>
                     </div>
 
-                    <!-- Table -->
-                    <div class="table-wrapper">
-                        <table>
+                    <button class="calendar-btn" onclick="syncData()" title="Sincronizar" id="btnSync">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="card table-card">
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">
+                                    <span style="font-size: 1.1rem;">✓</span>
+                                </th>
+                                <th>Nº Pedido</th>
+                                <th>Razão Social</th>
+                                <th>CNPJ</th>
+                                <th>Documento</th>
+                                <th>Valor Total</th>
+                                <th>Status</th>
+                                <th style="text-align: center;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pedidosContainer"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE FORMULÁRIO -->
+    <div class="modal-overlay" id="formModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="formTitle">Novo Pedido de Faturamento</h3>
+                <button class="close-modal" onclick="closeFormModal()">✕</button>
+            </div>
+            
+            <div class="tabs-container">
+                <div class="tabs-nav">
+                    <button class="tab-btn active" onclick="switchTab('tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchTab('tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn" onclick="switchTab('tab-itens')">Itens</button>
+                    <button class="tab-btn" onclick="switchTab('tab-entrega')">Entrega</button>
+                    <button class="tab-btn" onclick="switchTab('tab-transporte')">Transporte</button>
+                </div>
+
+                <!-- TAB GERAL -->
+                <div class="tab-content active" id="tab-geral">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="codigo">Código</label>
+                            <input type="text" id="codigo">
+                        </div>
+                        <div class="form-group">
+                            <label for="documento">Documento</label>
+                            <input type="text" id="documento">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB FATURAMENTO -->
+                <div class="tab-content" id="tab-faturamento">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="cnpj">CNPJ</label>
+                            <input type="text" id="cnpj" oninput="buscarClientePorCNPJ(this.value)" maxlength="18">
+                            <div id="cnpjSuggestions" class="autocomplete-suggestions"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="razaoSocial">Razão Social</label>
+                            <input type="text" id="razaoSocial">
+                        </div>
+                        <div class="form-group">
+                            <label for="inscricaoEstadual">Inscrição Estadual</label>
+                            <input type="text" id="inscricaoEstadual">
+                        </div>
+                        <div class="form-group">
+                            <label for="telefone">Telefone</label>
+                            <input type="text" id="telefone" maxlength="15">
+                        </div>
+                        <div class="form-group">
+                            <label for="contato">Contato</label>
+                            <input type="text" id="contato">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">E-mail</label>
+                            <input type="email" id="email">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="endereco">Endereço</label>
+                            <input type="text" id="endereco">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB ITENS -->
+                <div class="tab-content" id="tab-itens">
+                    <button type="button" onclick="addItem()" class="btn-add-item" style="margin-bottom: 1rem; background: #22C55E;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Adicionar Item
+                    </button>
+                    <div class="items-table-container">
+                        <table class="items-table">
                             <thead>
                                 <tr>
-                                    <th>Nº Pedido</th>
-                                    <th>Cliente</th>
-                                    <th>CNPJ</th>
-                                    <th>Status</th>
+                                    <th>Item</th>
+                                    <th>Cód. Estoque</th>
+                                    <th>Especificação</th>
+                                    <th>UN</th>
+                                    <th>Qtd</th>
+                                    <th>Valor Un. (R$)</th>
                                     <th>Valor Total</th>
-                                    <th>Responsável</th>
-                                    <th>Ações</th>
+                                    <th>NCM</th>
+                                    <th></th>
                                 </tr>
                             </thead>
-                            <tbody id="pedidosTable">
-                                <tr>
-                                    <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                                        Carregando pedidos...
-                                    </td>
-                                </tr>
-                            </tbody>
+                            <tbody id="itemsContainer"></tbody>
                         </table>
                     </div>
+                    <div class="form-grid" style="margin-top: 1.5rem;">
+                        <div class="form-group">
+                            <label for="valorTotalPedido">Valor Total do Pedido</label>
+                            <input type="text" id="valorTotalPedido" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="peso">Peso Total (kg)</label>
+                            <input type="text" id="peso">
+                        </div>
+                        <div class="form-group">
+                            <label for="quantidade">Quantidade Total</label>
+                            <input type="number" id="quantidade" min="0" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="volumes">Volumes</label>
+                            <input type="text" id="volumes">
+                        </div>
+                    </div>
                 </div>
 
-                <!-- FORMULÁRIO DE PEDIDO -->
-                <div id="formView" class="form-view" style="display: none;">
-                    <div class="form-header">
-                        <h2 id="formTitle">Novo Pedido</h2>
-                        <button onclick="hideFormulario()" class="btn-close-form">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
+                <!-- TAB ENTREGA -->
+                <div class="tab-content" id="tab-entrega">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="localEntrega">Local de Entrega</label>
+                            <textarea id="localEntrega" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="setor">Setor</label>
+                            <input type="text" id="setor">
+                        </div>
+                        <div class="form-group">
+                            <label for="previsaoEntrega">Previsão de Entrega</label>
+                            <input type="date" id="previsaoEntrega">
+                        </div>
                     </div>
-
-                    <!-- Warning de Estoque -->
-                    <div id="estoqueWarning" class="estoque-warning" style="display: none;">
-                        ⚠️ Não é possível confirmar a emissão deste pedido sem referência ao estoque
-                    </div>
-
-                    <!-- Tabs -->
-                    <div class="form-tabs">
-                        <button class="tab-btn active" onclick="switchTab(0)">Geral</button>
-                        <button class="tab-btn" onclick="switchTab(1)">Faturamento</button>
-                        <button class="tab-btn" onclick="switchTab(2)">Itens</button>
-                        <button class="tab-btn" onclick="switchTab(3)">Entrega</button>
-                        <button class="tab-btn" onclick="switchTab(4)">Transporte</button>
-                    </div>
-
-                    <form id="pedidoForm">
-                        <!-- TAB 1: GERAL -->
-                        <div class="tab-content active" id="tab-geral">
-                            <div class="form-grid">
-                                <div class="form-group form-group-small">
-                                    <label>Nº do Pedido *</label>
-                                    <input type="text" id="codigo" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>CNPJ/CPF *</label>
-                                    <input type="text" id="cnpj" required maxlength="18" oninput="buscarClientePorCNPJ(this.value)">
-                                    <div id="cnpjSuggestions" class="autocomplete-suggestions"></div>
-                                </div>
-                                <div class="form-group">
-                                    <label>Razão Social *</label>
-                                    <input type="text" id="razaoSocial" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Vendedor</label>
-                                    <input type="text" id="vendedor">
-                                </div>
-                                <div class="form-group">
-                                    <label>Responsável *</label>
-                                    <input type="text" id="responsavel" readonly style="background: var(--bg-secondary); cursor: not-allowed;">
-                                </div>
-                                <div class="form-group">
-                                    <label>Data do Pedido</label>
-                                    <input type="date" id="data_pedido" readonly style="background: var(--bg-secondary); cursor: not-allowed;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- TAB 2: FATURAMENTO -->
-                        <div class="tab-content" id="tab-faturamento">
-                            <div class="form-grid">
-                                <div class="form-group form-group-small">
-                                    <label>Documento</label>
-                                    <input type="text" id="documento">
-                                </div>
-                                <div class="form-group">
-                                    <label>Inscrição Estadual</label>
-                                    <input type="text" id="inscricaoEstadual">
-                                </div>
-                                <div class="form-group">
-                                    <label>Endereço</label>
-                                    <input type="text" id="endereco">
-                                </div>
-                                <div class="form-group">
-                                    <label>Telefone</label>
-                                    <input type="text" id="telefone">
-                                </div>
-                                <div class="form-group">
-                                    <label>Contato</label>
-                                    <input type="text" id="contato">
-                                </div>
-                                <div class="form-group">
-                                    <label>Email</label>
-                                    <input type="email" id="email">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- TAB 3: ITENS -->
-                        <div class="tab-content" id="tab-itens">
-                            <button type="button" onclick="addItem()" class="btn-add-item">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                                Adicionar Item
-                            </button>
-                            <div id="itensContainer"></div>
-                        </div>
-
-                        <!-- TAB 4: ENTREGA -->
-                        <div class="tab-content" id="tab-entrega">
-                            <div class="form-grid">
-                                <div class="form-group full-width">
-                                    <label>Local de Entrega</label>
-                                    <input type="text" id="localEntrega">
-                                </div>
-                                <div class="form-group">
-                                    <label>Setor</label>
-                                    <input type="text" id="setor">
-                                </div>
-                                <div class="form-group">
-                                    <label>Previsão de Entrega</label>
-                                    <input type="date" id="previsaoEntrega">
-                                </div>
-                                <div class="form-group">
-                                    <label>Peso (kg)</label>
-                                    <input type="number" id="peso" step="0.01" min="0">
-                                </div>
-                                <div class="form-group">
-                                    <label>Quantidade</label>
-                                    <input type="number" id="quantidade" min="1">
-                                </div>
-                                <div class="form-group">
-                                    <label>Volumes</label>
-                                    <input type="number" id="volumes" min="1">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- TAB 5: TRANSPORTE -->
-                        <div class="tab-content" id="tab-transporte">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label>Transportadora</label>
-                                    <input type="text" id="transportadora">
-                                </div>
-                                <div class="form-group">
-                                    <label>Valor do Frete</label>
-                                    <input type="text" id="valorFrete">
-                                </div>
-                                <div class="form-group">
-                                    <label>Valor Total do Pedido</label>
-                                    <input type="number" id="valorTotalPedido" step="0.01" min="0">
-                                </div>
-                                <div class="form-group full-width">
-                                    <label>Observações</label>
-                                    <textarea id="observacoes" rows="4"></textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Form Actions -->
-                        <div class="form-actions">
-                            <button type="button" onclick="hideFormulario()" class="btn-secondary">Cancelar</button>
-                            <button type="submit" class="btn-primary">Salvar Pedido</button>
-                            <button type="button" id="btnConfirmarEmissao" onclick="confirmarEmissao()" class="btn-success" style="display: none;">
-                                Confirmar Emissão
-                            </button>
-                        </div>
-                    </form>
                 </div>
+
+                <!-- TAB TRANSPORTE -->
+                <div class="tab-content" id="tab-transporte">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="transportadora">Transportadora</label>
+                            <select id="transportadora">
+                                <option value="">Selecione...</option>
+                                <option value="TNT MERCÚRIO">TNT MERCÚRIO</option>
+                                <option value="BRASPRESS">BRASPRESS</option>
+                                <option value="GENEROSO">GENEROSO</option>
+                                <option value="CONTINENTAL">CONTINENTAL</option>
+                                <option value="JEOLOG">JEOLOG</option>
+                                <option value="TG TRANSPORTES">TG TRANSPORTES</option>
+                                <option value="MOVVI">MOVVI</option>
+                                <option value="FAVORITA TRANSPORTES">FAVORITA TRANSPORTES</option>
+                                <option value="CORREIOS">CORREIOS</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="valorFrete">Valor do Frete (R$)</label>
+                            <input type="text" id="valorFrete">
+                        </div>
+                        <div class="form-group">
+                            <label for="vendedor">Vendedor</label>
+                            <select id="vendedor">
+                                <option value="">Selecione...</option>
+                                <option value="Roberto">ROBERTO</option>
+                                <option value="Isaque">ISAQUE</option>
+                                <option value="Miguel">MIGUEL</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="btnPrevious" onclick="previousTab()" class="secondary" style="display: none;">Anterior</button>
+                <button type="button" id="btnNext" onclick="nextTab()" class="secondary">Próximo</button>
+                <button type="button" onclick="closeFormModal()" class="cancel-close">Cancelar</button>
+                <button type="button" id="btnSave" onclick="savePedido()" class="btn-save-green" style="display: none;">Salvar Pedido</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL CALENDÁRIO -->
-    <div class="modal-overlay" id="calendarModal" style="display: none;">
-        <div class="modal-content modal-calendar">
+    <!-- MODAL DE VISUALIZAÇÃO -->
+    <div class="modal-overlay" id="infoModal">
+        <div class="modal-content">
             <div class="modal-header">
-                <h3>Selecionar Mês</h3>
-                <button class="close-modal" onclick="toggleCalendar()">✕</button>
+                <h3 class="modal-title">Pedido Nº <span id="modalCodigo"></span></h3>
+                <button class="close-modal" onclick="closeInfoModal()">✕</button>
             </div>
-            <div class="calendar-year-nav">
-                <button onclick="changeCalendarYear(-1)" class="year-nav-btn">‹</button>
-                <h3 id="calendarYear">2026</h3>
-                <button onclick="changeCalendarYear(1)" class="year-nav-btn">›</button>
+            
+            <div class="tabs-container">
+                <div class="tabs-nav">
+                    <button class="tab-btn active" onclick="switchInfoTab('info-tab-geral')">Geral</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-faturamento')">Faturamento</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-itens')">Itens</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-entrega')">Entrega</button>
+                    <button class="tab-btn" onclick="switchInfoTab('info-tab-transporte')">Transporte</button>
+                </div>
+
+                <div class="tab-content active" id="info-tab-geral"></div>
+                <div class="tab-content" id="info-tab-faturamento"></div>
+                <div class="tab-content" id="info-tab-itens"></div>
+                <div class="tab-content" id="info-tab-entrega"></div>
+                <div class="tab-content" id="info-tab-transporte"></div>
             </div>
-            <div class="calendar-months" id="calendarMonths"></div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="closeInfoModal()" class="cancel-close">Fechar</button>
+            </div>
         </div>
     </div>
 
+    <script>
+        setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            if (splash) splash.style.display = 'none';
+        }, 3000);
+    </script>
     <script src="script.js"></script>
 </body>
 </html>
