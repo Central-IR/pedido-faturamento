@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 
 app.use(cors());
-app.use(express.json()); // ✅ ESSENCIAL
+app.use(express.json());
 
 // ==============================
 // VARIÁVEIS DE AMBIENTE
@@ -223,7 +223,6 @@ app.get('/api/estoque', verificarAutenticacao, async (req, res) => {
     }
 });
 
-// ✅ CORRIGIDO: Atualiza estoque pelo CÓDIGO (não pelo ID)
 app.patch('/api/estoque/:codigo', verificarAutenticacao, async (req, res) => {
     try {
         console.log(`Atualizando estoque código ${req.params.codigo}:`, req.body);
@@ -275,4 +274,5 @@ app.listen(PORT, () => {
     console.log('📦 Supabase conectado com Service Role');
     console.log('💾 Tabela: pedidos_faturamento');
     console.log('📊 Estoque: Atualização por código');
+    console.log('✨ Novas colunas: responsavel, data_registro');
 });
