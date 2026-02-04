@@ -212,26 +212,8 @@ h2 {
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
 }
 
-.btn-cancel-form {
-    background: #EF4444;
-    color: white;
-    border: none;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-}
-
-.btn-cancel-form:hover {
-    background: #DC2626;
-    transform: translateY(-1px);
+.form-group-small {
+    max-width: 200px;
 }
 
 .search-bar-wrapper {
@@ -669,6 +651,10 @@ button.small {
 .actions-cell {
     white-space: nowrap;
     min-width: 260px;
+}
+
+.form-group-small {
+    max-width: 200px;
 }
 
 .stock-warning {
