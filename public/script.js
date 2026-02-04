@@ -991,7 +991,7 @@ async function savePedido() {
         }
         
         await loadPedidos();
-        closeFormMode();
+        closeFormModal();
         
         if (editingId) {
             showMessage(`Pedido ${codigo} atualizado`, 'success');
@@ -1129,144 +1129,152 @@ function viewPedido(id) {
     
     document.getElementById('modalCodigo').textContent = pedido.codigo;
     
+    // Formatar status badge
+    const statusClass = pedido.status === 'emitida' ? 'fechada' : 'aberta';
+    const statusText = pedido.status === 'emitida' ? 'FECHADA' : 'ABERTA';
+    
     document.getElementById('info-tab-geral').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group">
-                <label>Código</label>
-                <input type="text" value="${pedido.codigo}" readonly>
+        <div class="info-section">
+            <h4>Informações Gerais</h4>
+            <div class="info-row">
+                <span class="info-label">Responsável:</span>
+                <span class="info-value">${pedido.responsavel || pedido.vendedor || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Documento</label>
-                <input type="text" value="${pedido.documento || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Data:</span>
+                <span class="info-value">${pedido.data_registro ? formatarData(pedido.data_registro) : '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Responsável</label>
-                <input type="text" value="${pedido.responsavel || pedido.vendedor || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Data de Registro</label>
-                <input type="text" value="${pedido.data_registro ? formatarData(pedido.data_registro) : '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="badge ${statusClass}">${statusText}</span>
             </div>
         </div>
     `;
     
     document.getElementById('info-tab-faturamento').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group">
-                <label>CNPJ</label>
-                <input type="text" value="${formatarCNPJ(pedido.cnpj)}" readonly>
+        <div class="info-section">
+            <h4>Dados de Faturamento</h4>
+            <div class="info-row">
+                <span class="info-label">CNPJ:</span>
+                <span class="info-value">${formatarCNPJ(pedido.cnpj)}</span>
             </div>
-            <div class="form-group">
-                <label>Razão Social</label>
-                <input type="text" value="${pedido.razao_social}" readonly>
+            <div class="info-row">
+                <span class="info-label">Razão Social:</span>
+                <span class="info-value">${pedido.razao_social}</span>
             </div>
-            <div class="form-group">
-                <label>Inscrição Estadual</label>
-                <input type="text" value="${pedido.inscricao_estadual || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Inscrição Estadual:</span>
+                <span class="info-value">${pedido.inscricao_estadual || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Telefone</label>
-                <input type="text" value="${pedido.telefone || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Endereço:</span>
+                <span class="info-value">${pedido.endereco}</span>
             </div>
-            <div class="form-group">
-                <label>Contato</label>
-                <input type="text" value="${pedido.contato || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Telefone:</span>
+                <span class="info-value">${pedido.telefone || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>E-mail</label>
-                <input type="text" value="${pedido.email || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Contato:</span>
+                <span class="info-value">${pedido.contato || '-'}</span>
             </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Endereço</label>
-                <input type="text" value="${pedido.endereco}" readonly>
+            <div class="info-row">
+                <span class="info-label">E-mail:</span>
+                <span class="info-value">${pedido.email || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Documento:</span>
+                <span class="info-value">${pedido.documento || '-'}</span>
             </div>
         </div>
     `;
     
     const items = Array.isArray(pedido.items) ? pedido.items : [];
     document.getElementById('info-tab-itens').innerHTML = `
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Cód. Estoque</th>
-                    <th>Especificação</th>
-                    <th>UN</th>
-                    <th>Quantidade</th>
-                    <th>Valor Unitário</th>
-                    <th>Valor Total</th>
-                    <th>NCM</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${items.map((item, index) => `
+        <div class="info-section">
+            <h4>Itens do Pedido</h4>
+            <table class="items-table">
+                <thead>
                     <tr>
-                        <td>${index + 1}</td>
-                        <td>${item.codigoEstoque || '-'}</td>
-                        <td>${item.especificacao || '-'}</td>
-                        <td>${item.unidade || '-'}</td>
-                        <td>${item.quantidade || 0}</td>
-                        <td>${formatarMoeda(item.valorUnitario || 0)}</td>
-                        <td>${item.valorTotal || 'R$ 0,00'}</td>
-                        <td>${item.ncm || '-'}</td>
+                        <th>Item</th>
+                        <th>Cód. Estoque</th>
+                        <th>Especificação</th>
+                        <th>UN</th>
+                        <th>Quantidade</th>
+                        <th>Valor Unitário</th>
+                        <th>Valor Total</th>
+                        <th>NCM</th>
                     </tr>
-                `).join('')}
-            </tbody>
-        </table>
-        <div class="form-grid" style="margin-top: 1.5rem;">
-            <div class="form-group">
-                <label>Valor Total</label>
-                <input type="text" value="${pedido.valor_total || 'R$ 0,00'}" readonly>
+                </thead>
+                <tbody>
+                    ${items.map((item, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${item.codigoEstoque || '-'}</td>
+                            <td>${item.especificacao || '-'}</td>
+                            <td>${item.unidade || '-'}</td>
+                            <td>${item.quantidade || 0}</td>
+                            <td>${formatarMoeda(item.valorUnitario || 0)}</td>
+                            <td>${item.valorTotal || 'R$ 0,00'}</td>
+                            <td>${item.ncm || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div class="info-section" style="margin-top: 1.5rem;">
+            <h4>Totais</h4>
+            <div class="info-row">
+                <span class="info-label">Valor Total:</span>
+                <span class="info-value"><strong>${pedido.valor_total || 'R$ 0,00'}</strong></span>
             </div>
-            <div class="form-group">
-                <label>Peso (kg)</label>
-                <input type="text" value="${pedido.peso || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Peso (kg):</span>
+                <span class="info-value">${pedido.peso || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Quantidade Total</label>
-                <input type="text" value="${pedido.quantidade || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Quantidade Total:</span>
+                <span class="info-value">${pedido.quantidade || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Volumes</label>
-                <input type="text" value="${pedido.volumes || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Volumes:</span>
+                <span class="info-value">${pedido.volumes || '-'}</span>
             </div>
         </div>
     `;
     
     document.getElementById('info-tab-entrega').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Local de Entrega</label>
-                <textarea readonly rows="3">${pedido.local_entrega || '-'}</textarea>
+        <div class="info-section">
+            <h4>Informações de Entrega</h4>
+            <div class="info-row">
+                <span class="info-label">Local de Entrega:</span>
+                <span class="info-value">${pedido.local_entrega || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Setor</label>
-                <input type="text" value="${pedido.setor || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Setor:</span>
+                <span class="info-value">${pedido.setor || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Previsão de Entrega</label>
-                <input type="text" value="${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Previsão de Entrega:</span>
+                <span class="info-value">${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}</span>
             </div>
         </div>
     `;
     
     document.getElementById('info-tab-transporte').innerHTML = `
-        <div class="form-grid">
-            <div class="form-group">
-                <label>Transportadora</label>
-                <input type="text" value="${pedido.transportadora || '-'}" readonly>
+        <div class="info-section">
+            <h4>Informações de Transporte</h4>
+            <div class="info-row">
+                <span class="info-label">Transportadora:</span>
+                <span class="info-value">${pedido.transportadora || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Valor do Frete</label>
-                <input type="text" value="${pedido.valor_frete || '-'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Valor do Frete:</span>
+                <span class="info-value">${pedido.valor_frete || '-'}</span>
             </div>
-            <div class="form-group">
-                <label>Vendedor</label>
-                <input type="text" value="${pedido.vendedor || '-'}" readonly>
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <input type="text" value="${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}" readonly>
+            <div class="info-row">
+                <span class="info-label">Vendedor:</span>
+                <span class="info-value">${pedido.vendedor || '-'}</span>
             </div>
         </div>
     `;
@@ -1295,6 +1303,7 @@ async function toggleEmissao(id, checked) {
     if (!pedido) return;
     
     if (checked && pedido.status === 'pendente') {
+        // Validação 1: Informações básicas
         if (!pedido.cnpj || !pedido.razao_social || !pedido.endereco) {
             showMessage(`Não existem informações suficientes para o pedido ${pedido.codigo}`, 'error');
             document.getElementById(`check-${id}`).checked = false;
@@ -1303,7 +1312,7 @@ async function toggleEmissao(id, checked) {
         
         const items = Array.isArray(pedido.items) ? pedido.items : [];
         
-        // Verificar se todos os itens têm código de estoque
+        // Validação 2: TODOS os itens devem ter código de estoque
         let hasItemWithoutStockCode = false;
         for (const item of items) {
             if (!item.codigoEstoque || item.codigoEstoque.trim() === '') {
@@ -1312,12 +1321,13 @@ async function toggleEmissao(id, checked) {
             }
         }
         
-        if (hasItemWithoutStockCode) {
+        if (hasItemWithoutStockCode || items.length === 0) {
             showMessage('Não é possível confirmar a emissão deste pedido sem referência ao estoque', 'error');
             document.getElementById(`check-${id}`).checked = false;
             return;
         }
         
+        // Validação 3: Verificar se códigos existem no estoque e se há quantidade suficiente
         let estoqueInsuficiente = false;
         
         for (const item of items) {
@@ -1340,6 +1350,7 @@ async function toggleEmissao(id, checked) {
             return;
         }
         
+        // Confirmação do usuário
         if (!confirm(`Confirmar emissão para o pedido ${pedido.codigo}?`)) {
             document.getElementById(`check-${id}`).checked = false;
             return;
@@ -1352,6 +1363,7 @@ async function toggleEmissao(id, checked) {
                 checkboxLabel.style.pointerEvents = 'none';
             }
             
+            // Debitar estoque
             for (const item of items) {
                 const itemEstoque = estoqueCache[item.codigoEstoque];
                 const novaQuantidade = parseFloat(itemEstoque.quantidade) - item.quantidade;
@@ -1370,6 +1382,7 @@ async function toggleEmissao(id, checked) {
                 if (!response.ok) throw new Error('Erro ao atualizar estoque');
             }
             
+            // Atualizar status do pedido
             const response = await fetch(`${API_URL}/pedidos/${id}`, {
                 method: 'PATCH',
                 headers: {
@@ -1412,6 +1425,7 @@ async function toggleEmissao(id, checked) {
                 checkboxLabel.style.pointerEvents = 'none';
             }
             
+            // Devolver ao estoque
             for (const item of items) {
                 const itemEstoque = estoqueCache[item.codigoEstoque];
                 if (!itemEstoque) continue;
