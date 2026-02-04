@@ -14,6 +14,7 @@ let estoqueCache = {};
 let editingId = null;
 let sessionToken = null;
 let currentTabIndex = 0;
+let currentMonth = new Date(); // Mês atual para navegação
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
 // ============================================
@@ -479,29 +480,73 @@ function preencherDadosCliente(cnpj) {
 }
 
 // ============================================
+// NAVEGAÇÃO DE MESES
+// ============================================
+function changeMonth(direction) {
+    currentMonth.setMonth(currentMonth.getMonth() + direction);
+    updateDisplay();
+}
+
+function updateMonthDisplay() {
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const monthName = months[currentMonth.getMonth()];
+    const year = currentMonth.getFullYear();
+    const element = document.getElementById('currentMonth');
+    if (element) {
+        element.textContent = `${monthName} ${year}`;
+    }
+}
+
+function getPedidosForCurrentMonth() {
+    return pedidos.filter(pedido => {
+        if (!pedido.data_registro) return false;
+        const pedidoDate = new Date(pedido.data_registro + 'T00:00:00');
+        return pedidoDate.getMonth() === currentMonth.getMonth() &&
+               pedidoDate.getFullYear() === currentMonth.getFullYear();
+    });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString('pt-BR');
+}
+
+// ============================================
 // ATUALIZAR DISPLAY
 // ============================================
 function updateDisplay() {
-    const totalEmitidos = pedidos.filter(p => p.status === 'emitida').length;
-    const totalPendentes = pedidos.filter(p => p.status === 'pendente').length;
+    updateMonthDisplay();
+    updateDashboard();
+    updateTable();
+    updateVendedoresFilter();
+}
+
+// ============================================
+// ATUALIZAR DASHBOARD (POR MÊS)
+// ============================================
+function updateDashboard() {
+    const monthPedidos = getPedidosForCurrentMonth();
+    const totalEmitidos = monthPedidos.filter(p => p.status === 'emitida').length;
+    const totalPendentes = monthPedidos.filter(p => p.status === 'pendente').length;
     
-    const valorTotalGeral = pedidos.reduce((acc, p) => {
+    // Pegar o número do maior pedido geral (não apenas do mês)
+    const allCodigos = pedidos
+        .map(p => parseInt(p.codigo))
+        .filter(n => !isNaN(n));
+    const ultimoCodigo = allCodigos.length > 0 ? Math.max(...allCodigos) : 0;
+    
+    const valorTotalMes = monthPedidos.reduce((acc, p) => {
         const valor = parseMoeda(p.valor_total);
         return acc + valor;
     }, 0);
     
-    document.getElementById('totalPedidos').textContent = pedidos.length;
+    document.getElementById('totalPedidos').textContent = ultimoCodigo;
     document.getElementById('totalEmitidos').textContent = totalEmitidos;
     document.getElementById('totalPendentes').textContent = totalPendentes;
-    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotalGeral);
-    
-    updateVendedoresFilter();
-    updateTable();
+    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotalMes);
 }
-
-// ============================================
-// ATUALIZAR FILTRO DE VENDEDORES
-// ============================================
 function updateVendedoresFilter() {
     const vendedores = new Set();
     pedidos.forEach(p => {
@@ -538,7 +583,7 @@ function filterPedidos() {
 // ============================================
 function updateTable() {
     const container = document.getElementById('pedidosContainer');
-    let filtered = [...pedidos];
+    let filtered = getPedidosForCurrentMonth(); // Filtrar por mês primeiro
     
     const search = document.getElementById('search').value.toLowerCase();
     const filterVendedor = document.getElementById('filterVendedor').value;
@@ -564,9 +609,16 @@ function updateTable() {
     }
     
     if (filtered.length === 0) {
-        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado</td></tr>';
+        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado neste mês</td></tr>';
         return;
     }
+    
+    // Ordenar por código (crescente)
+    filtered.sort((a, b) => {
+        const numA = parseInt(a.codigo);
+        const numB = parseInt(b.codigo);
+        return numA - numB;
+    });
     
     container.innerHTML = filtered.map(pedido => `
         <tr class="${pedido.status === 'emitida' ? 'row-fechada' : ''}">
