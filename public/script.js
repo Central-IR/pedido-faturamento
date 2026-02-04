@@ -598,7 +598,7 @@ function updateTable() {
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">
                         Editar
                     </button>
-                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #1E3A8A;">
+                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">
                         Etiqueta
                     </button>
                 </div>
@@ -608,9 +608,9 @@ function updateTable() {
 }
 
 // ============================================
-// NAVEGAÇÃO ENTRE MODOS
+// MODAL DE FORMULÁRIO
 // ============================================
-function openFormMode() {
+function openFormModal() {
     editingId = null;
     currentTabIndex = 0;
     document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
@@ -623,14 +623,12 @@ function openFormMode() {
     document.getElementById('dataRegistro').value = getDataAtual();
     
     activateTab(0);
-    document.getElementById('viewMode').classList.add('hidden');
-    document.getElementById('formMode').classList.remove('hidden');
+    document.getElementById('formModal').classList.add('show');
 }
 
-function closeFormMode() {
+function closeFormModal() {
     const isEditing = editingId !== null;
-    document.getElementById('formMode').classList.add('hidden');
-    document.getElementById('viewMode').classList.remove('hidden');
+    document.getElementById('formModal').classList.remove('show');
     resetForm();
     
     if (isEditing) {
@@ -641,13 +639,19 @@ function closeFormMode() {
 }
 
 function resetForm() {
-    document.querySelectorAll('#formMode input:not([type="checkbox"]), #formMode textarea, #formMode select').forEach(input => {
+    document.querySelectorAll('#formModal input:not([type="checkbox"]), #formModal textarea, #formModal select').forEach(input => {
         if (input.type === 'checkbox') {
             input.checked = false;
         } else if (input.id !== 'codigo' && input.id !== 'dataRegistro') {
             input.value = '';
         }
     });
+    
+    // Reabilitar responsavel se estava desabilitado
+    const responsavelSelect = document.getElementById('responsavel');
+    if (responsavelSelect) {
+        responsavelSelect.disabled = false;
+    }
     
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
@@ -1111,8 +1115,7 @@ async function editPedido(id) {
     }
     
     activateTab(0);
-    document.getElementById('viewMode').classList.add('hidden');
-    document.getElementById('formMode').classList.remove('hidden');
+    document.getElementById('formModal').classList.add('show');
     
     checkStockReferences();
 }
