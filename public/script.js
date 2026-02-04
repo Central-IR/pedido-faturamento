@@ -14,13 +14,7 @@ let estoqueCache = {};
 let editingId = null;
 let sessionToken = null;
 let currentTabIndex = 0;
-let currentMonth = new Date();
-let currentUser = null;
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
-const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-];
 
 // ============================================
 // FUNÇÕES AUXILIARES
@@ -527,19 +521,8 @@ function updateTable() {
     const container = document.getElementById('pedidosContainer');
     let filtered = [...pedidos];
     
-    // Filtrar por mês selecionado
-    const mesSelecionado = currentMonth.getMonth();
-    const anoSelecionado = currentMonth.getFullYear();
-    filtered = filtered.filter(p => {
-        if (!p.data_pedido) return false;
-        const dataPedido = new Date(p.data_pedido);
-        return dataPedido.getMonth() === mesSelecionado && 
-               dataPedido.getFullYear() === anoSelecionado;
-    });
-    
     const search = document.getElementById('search').value.toLowerCase();
-    const filterVendedor = document.getElementById('filterVendedor') ? document.getElementById('filterVendedor').value : '';
-    const filterResponsavel = document.getElementById('filterResponsavel') ? document.getElementById('filterResponsavel').value : '';
+    const filterVendedor = document.getElementById('filterVendedor').value;
     const filterStatus = document.getElementById('filterStatus').value;
     
     if (search) {
@@ -554,23 +537,12 @@ function updateTable() {
         filtered = filtered.filter(p => (p.vendedor || '') === filterVendedor);
     }
     
-    if (filterResponsavel) {
-        filtered = filtered.filter(p => (p.responsavel || '') === filterResponsavel);
-    }
-    
     if (filterStatus) {
         filtered = filtered.filter(p => p.status === filterStatus);
     }
     
-    // Ordenar por código (crescente)
-    filtered.sort((a, b) => {
-        const codigoA = parseInt(a.codigo) || 0;
-        const codigoB = parseInt(b.codigo) || 0;
-        return codigoA - codigoB;
-    });
-    
     if (filtered.length === 0) {
-        container.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado</td></tr>';
+        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado</td></tr>';
         return;
     }
     
@@ -596,7 +568,6 @@ function updateTable() {
                     ${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}
                 </span>
             </td>
-            <td>${pedido.responsavel || '-'}</td>
             <td>
                 <div class="actions">
                     <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #F59E0B;">
@@ -607,6 +578,9 @@ function updateTable() {
                     </button>
                     <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #1E3A8A;">
                         Etiqueta
+                    </button>
+                    <button onclick="deletePedido('${pedido.id}')" class="action-btn" style="background: #EF4444;">
+                        Excluir
                     </button>
                 </div>
             </td>
@@ -836,21 +810,6 @@ function openFormModal() {
     const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => parseInt(p.codigo) || 0)) : 0;
     document.getElementById('codigo').value = (maxCodigo + 1).toString();
     
-    // Preencher responsável automaticamente
-    if (currentUser && currentUser.username) {
-        const responsavelInput = document.getElementById('responsavel');
-        if (responsavelInput) {
-            responsavelInput.value = currentUser.username;
-        }
-    }
-    
-    // Preencher data do pedido automaticamente
-    const hoje = new Date().toISOString().split('T')[0];
-    const dataPedidoInput = document.getElementById('dataPedido');
-    if (dataPedidoInput) {
-        dataPedidoInput.value = hoje;
-    }
-    
     activateTab(0);
     document.getElementById('formModal').classList.add('show');
 }
@@ -921,9 +880,7 @@ async function savePedido() {
         transportadora: document.getElementById('transportadora').value.trim(),
         valor_frete: document.getElementById('valorFrete').value,
         vendedor,
-        responsavel: document.getElementById('responsavel').value.trim(),
-        data_pedido: document.getElementById('dataPedido').value,
-        status: 'PENDENTE'
+        status: 'pendente'
     };
     
     try {
@@ -1564,143 +1521,9 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
                 };
             <\/script>
         </body>
-
-// ============================================
-// NAVEGAÇÃO POR MESES - ADICIONADO
-// ============================================
-let currentMonth = new Date();
-let currentUser = null;
-const meses = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-];
-
-function updateDisplay() {
-    const display = document.getElementById('currentMonth');
-    if (display) {
-        display.textContent = `${meses[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
-    }
-    atualizarDashboardMensal();
-    filterPedidos();
+        </html>
+    `);
+    printWindow.document.close();
+    
+    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
 }
-
-window.changeMonth = function(direction) {
-    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1);
-    updateDisplay();
-};
-
-function atualizarDashboardMensal() {
-    const mesSelecionado = currentMonth.getMonth();
-    const anoSelecionado = currentMonth.getFullYear();
-    
-    const pedidosDoMes = pedidos.filter(p => {
-        if (!p.data_pedido) return false;
-        const dataPedido = new Date(p.data_pedido);
-        return dataPedido.getMonth() === mesSelecionado && 
-               dataPedido.getFullYear() === anoSelecionado;
-    });
-    
-    const total = pedidosDoMes.length;
-    const emitidos = pedidosDoMes.filter(p => p.status === 'EMITIDO').length;
-    const pendentes = pedidosDoMes.filter(p => p.status === 'PENDENTE').length;
-    
-    const valorTotal = pedidosDoMes.reduce((sum, p) => {
-        const valor = parseFloat(p.valor_total) || 0;
-        return sum + valor;
-    }, 0);
-    
-    document.getElementById('totalPedidos').textContent = total;
-    document.getElementById('totalEmitidos').textContent = emitidos;
-    document.getElementById('totalPendentes').textContent = pendentes;
-    document.getElementById('valorTotal').textContent = formatarMoeda(valorTotal);
-}
-
-// Obter dados do usuário
-async function obterDadosUsuarioLogado() {
-    try {
-        const response = await fetch(`${PORTAL_URL}/api/verify-session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionToken })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            if (data.valid && data.session) {
-                currentUser = data.session;
-                console.log('👤 Usuário logado:', currentUser.username);
-            }
-        }
-    } catch (error) {
-        console.error('Erro ao obter usuário:', error);
-    }
-}
-
-// Validação de estoque
-function verificarEstoque() {
-    const tbody = document.getElementById('itemsContainer');
-    if (!tbody) return true;
-    
-    const rows = tbody.querySelectorAll('tr');
-    let todosPreenchidos = true;
-    
-    rows.forEach(row => {
-        const codigoEstoque = row.querySelector('[id^="codigoEstoque-"]');
-        if (codigoEstoque && !codigoEstoque.value.trim()) {
-            todosPreenchidos = false;
-        }
-    });
-    
-    const warning = document.getElementById('estoqueWarning');
-    if (warning) {
-        warning.style.display = todosPreenchidos ? 'none' : 'block';
-    }
-    
-    return todosPreenchidos;
-}
-
-// Confirmar emissão
-window.confirmarEmissao = async function() {
-    if (!editingId) {
-        showMessage('Salve o pedido antes de confirmar a emissão', 'error');
-        return;
-    }
-    
-    if (!verificarEstoque()) {
-        showMessage('Preencha todos os códigos do estoque antes de confirmar', 'error');
-        return;
-    }
-    
-    if (!confirm('Confirmar emissão deste pedido?')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_URL}/pedidos/${editingId}/confirmar-emissao`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Session-Token': sessionToken
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Erro ao confirmar emissão');
-        }
-        
-        showMessage('Emissão confirmada com sucesso!', 'success');
-        closeFormModal();
-        await loadPedidos();
-    } catch (error) {
-        console.error('Erro:', error);
-        showMessage('Erro ao confirmar emissão', 'error');
-    }
-};
-
-// Inicializar ao carregar
-document.addEventListener('DOMContentLoaded', async () => {
-    await obterDadosUsuarioLogado();
-    updateDisplay();
-});
-
-console.log('✅ Módulo de navegação mensal carregado');
