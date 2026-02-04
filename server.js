@@ -266,51 +266,6 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.patch('/api/pedidos/:id/confirmar-emissao', verificarAutenticacao, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        console.log(`📤 PATCH /api/pedidos/${id}/confirmar-emissao`);
-        
-        // Atualizar status para EMITIDO
-        const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos_faturamento?id=eq.${id}`,
-            {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    apikey: SUPABASE_KEY,
-                    Authorization: `Bearer ${SUPABASE_KEY}`,
-                    'Prefer': 'return=representation'
-                },
-                body: JSON.stringify({
-                    status: 'EMITIDO'
-                })
-            }
-        );
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Erro Supabase:', errorText);
-            return res.status(response.status).json({ 
-                error: 'Erro ao confirmar emissão',
-                details: errorText 
-            });
-        }
-        
-        const data = await response.json();
-        console.log('✅ Emissão confirmada:', id);
-        
-        res.json(data[0]);
-    } catch (error) {
-        console.error('❌ Erro ao confirmar emissão:', error);
-        res.status(500).json({ 
-            error: 'Erro interno ao confirmar emissão',
-            message: error.message 
-        });
-    }
-});
-
 // ==============================
 // INICIAR SERVIDOR
 // ==============================
