@@ -883,6 +883,31 @@ button.small {
     line-height: 1.6;
 }
 
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 150px;
+}
+
+.info-value {
+    flex: 1;
+    text-align: left;
+    color: var(--text-primary);
+    padding-left: 1rem;
+}
+
 .items-table {
     width: 100%;
     margin: 1rem 0;
