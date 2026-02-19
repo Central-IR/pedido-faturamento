@@ -15,6 +15,8 @@ let editingId = null;
 let sessionToken = null;
 let currentTabIndex = 0;
 let currentMonth = new Date(); // Mês atual para navegação
+let isLoadingMonth = false;
+let lastDataHash = '';
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
 // ============================================
@@ -190,19 +192,14 @@ async function checkConnection() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        const response = await fetch(`${API_URL}/pedidos`, {
-            method: 'HEAD',
+        const response = await fetch(`${API_URL}/health`, {
+            method: 'GET',
             headers: { 'X-Session-Token': sessionToken },
-            signal: controller.signal
+            signal: controller.signal,
+            cache: 'no-cache'
         });
         
         clearTimeout(timeoutId);
-
-        if (response.status === 401) {
-            sessionStorage.removeItem('pedidosSession');
-            mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
-            return false;
-        }
 
         const wasOffline = !isOnline;
         isOnline = response.ok;
@@ -272,8 +269,14 @@ async function syncData() {
 async function loadPedidos() {
     if (!isOnline) return;
     try {
-        const response = await fetch(`${API_URL}/pedidos`, {
-            headers: { 'X-Session-Token': sessionToken }
+        // Buscar apenas o mês/ano atual — sem acumular dados
+        const mes = currentMonth.getMonth();
+        const ano = currentMonth.getFullYear();
+        const url = `${API_URL}/pedidos?mes=${mes}&ano=${ano}`;
+
+        const response = await fetch(url, {
+            headers: { 'X-Session-Token': sessionToken },
+            cache: 'no-cache'
         });
 
         if (response.status === 401) {
@@ -283,8 +286,10 @@ async function loadPedidos() {
         }
 
         if (response.ok) {
+            // Substituir completamente — sem acúmulo de meses anteriores
             pedidos = await response.json();
             atualizarCacheClientes(pedidos);
+            lastDataHash = JSON.stringify(pedidos.map(p => p.id));
             updateDisplay();
         }
     } catch (error) {
@@ -484,7 +489,12 @@ function preencherDadosCliente(cnpj) {
 // ============================================
 function changeMonth(direction) {
     currentMonth.setMonth(currentMonth.getMonth() + direction);
-    updateDisplay();
+    // Descartar dados do mês anterior e buscar o novo mês
+    pedidos = [];
+    lastDataHash = '';
+    isLoadingMonth = true;
+    updateDisplay(); // Atualiza UI imediatamente com indicador de carregamento
+    loadPedidos().finally(() => { isLoadingMonth = false; });
 }
 
 function updateMonthDisplay() {
@@ -499,12 +509,8 @@ function updateMonthDisplay() {
 }
 
 function getPedidosForCurrentMonth() {
-    return pedidos.filter(pedido => {
-        if (!pedido.data_registro) return false;
-        const pedidoDate = new Date(pedido.data_registro + 'T00:00:00');
-        return pedidoDate.getMonth() === currentMonth.getMonth() &&
-               pedidoDate.getFullYear() === currentMonth.getFullYear();
-    });
+    // Os dados em `pedidos` já foram buscados filtrados pelo mês/ano no servidor
+    return pedidos;
 }
 
 function formatDate(dateString) {
@@ -531,11 +537,8 @@ function updateDashboard() {
     const totalEmitidos = monthPedidos.filter(p => p.status === 'emitida').length;
     const totalPendentes = monthPedidos.filter(p => p.status === 'pendente').length;
     
-    // Pegar o número do maior pedido geral (não apenas do mês)
-    const allCodigos = pedidos
-        .map(p => parseInt(p.codigo))
-        .filter(n => !isNaN(n));
-    const ultimoCodigo = allCodigos.length > 0 ? Math.max(...allCodigos) : 0;
+    // Total de pedidos no mês (pedidos[] já está filtrado pelo mês)
+    const ultimoCodigo = monthPedidos.length;
     
     const valorTotalMes = monthPedidos.reduce((acc, p) => {
         const valor = parseMoeda(p.valor_total);
@@ -609,7 +612,30 @@ function updateTable() {
     }
     
     if (filtered.length === 0) {
-        container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum pedido encontrado neste mês</td></tr>';
+        if (isLoadingMonth) {
+            container.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 2.5rem;">
+                        <div style="display: inline-flex; align-items: center; gap: 12px; color: var(--text-secondary, #aaa);">
+                            <div style="
+                                width: 22px; height: 22px;
+                                border-radius: 50%;
+                                border: 2.5px solid transparent;
+                                border-top-color: #e07b00;
+                                border-right-color: #f5a623;
+                                border-bottom-color: transparent;
+                                border-left-color: transparent;
+                                animation: spinLoader 0.75s linear infinite;
+                                flex-shrink: 0;
+                            "></div>
+                            <span style="font-size: 0.95rem; letter-spacing: 0.01em;">Carregando...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        } else {
+            container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum registro encontrado</td></tr>';
+        }
         return;
     }
     
