@@ -82,17 +82,33 @@ app.get('/api/health', (req, res) => {
 // ==============================
 app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
     try {
-        console.log('📥 GET /api/pedidos - Buscando pedidos...');
-        
-        const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=*&order=codigo.desc`,
-            {
-                headers: {
-                    apikey: SUPABASE_KEY,
-                    Authorization: `Bearer ${SUPABASE_KEY}`
-                }
+        const { mes, ano } = req.query;
+        let supabaseUrl;
+
+        if (mes !== undefined && ano !== undefined) {
+            const month = parseInt(mes); // 0-based (Janeiro = 0)
+            const year = parseInt(ano);
+
+            const startDate = new Date(year, month, 1);
+            const endDate = new Date(year, month + 1, 0);
+            const startStr = startDate.toISOString().split('T')[0];
+            const endStr = endDate.toISOString().split('T')[0];
+
+            console.log(`📥 GET /api/pedidos - Buscando de ${startStr} a ${endStr}...`);
+
+            // Filtrar por data_registro no intervalo do mês
+            supabaseUrl = `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=*&data_registro=gte.${startStr}T00:00:00&data_registro=lte.${endStr}T23:59:59&order=codigo.asc`;
+        } else {
+            console.log('📥 GET /api/pedidos - Buscando todos...');
+            supabaseUrl = `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=*&order=codigo.desc`;
+        }
+
+        const response = await fetch(supabaseUrl, {
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${SUPABASE_KEY}`
             }
-        );
+        });
 
         console.log('📊 Supabase response status:', response.status);
 
