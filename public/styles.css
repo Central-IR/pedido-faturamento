@@ -72,6 +72,10 @@ body {
     to { transform: rotate(360deg); }
 }
 
+@keyframes spinLoader {
+    to { transform: rotate(360deg); }
+}
+
 .splash-screen {
     position: fixed;
     top: 0;
@@ -993,8 +997,7 @@ button.small {
     gap: 0.75rem;
     justify-content: flex-end;
     margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 2px solid var(--border-color);
+    padding-top: 1rem;
 }
 
 .modal-actions button {
@@ -1011,7 +1014,6 @@ button.small {
     margin-bottom: 0.75rem;
     font-size: 1.1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--border-color);
 }
 
 .info-section p {
@@ -1021,27 +1023,20 @@ button.small {
 
 .info-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.info-row:last-child {
-    border-bottom: none;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
 }
 
 .info-label {
-    font-weight: 600;
-    color: var(--text-secondary);
-    min-width: 150px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .info-value {
-    flex: 1;
-    text-align: left;
     color: var(--text-primary);
-    padding-left: 1rem;
 }
 
 .items-table {
