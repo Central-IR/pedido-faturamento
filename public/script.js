@@ -17,8 +17,18 @@ let currentTabIndex = 0;
 let currentMonth = new Date(); // Mês atual para navegação
 let isLoadingMonth = false;
 let lastDataHash = '';
+let currentUser = null; // Usuário logado (para controle de permissões)
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
+
+// ── Controle de permissões ──────────────────────────────────────────────────
+const ROLES_CHECKBOX = ['administrador', 'financeiro']; // podem marcar emissão
+
+function userCanToggleEmissao() {
+    if (!currentUser) return false;
+    const role = (currentUser.role || currentUser.cargo || '').toLowerCase();
+    return ROLES_CHECKBOX.some(r => role.includes(r));
+}
 // ============================================
 // FUNÇÕES AUXILIARES
 // ============================================
@@ -80,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     verificarAutenticacao();
 });
 
-function verificarAutenticacao() {
+async function verificarAutenticacao() {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('sessionToken');
 
@@ -97,6 +107,30 @@ function verificarAutenticacao() {
         return;
     }
 
+    // Verificar sessão e capturar dados do usuário (cargo/role)
+    try {
+        const verifyRes = await fetch(`${PORTAL_URL}/api/verify-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+        });
+        if (verifyRes.ok) {
+            const sessionData = await verifyRes.json();
+            if (sessionData.valid && sessionData.session) {
+                currentUser = sessionData.session;
+                sessionStorage.setItem('pedidosUserData', JSON.stringify(currentUser));
+            } else {
+                mostrarTelaAcessoNegado('Sua sessão expirou');
+                return;
+            }
+        }
+    } catch(e) {
+        // Fallback: tentar do cache local
+        try {
+            const userData = sessionStorage.getItem('pedidosUserData');
+            if (userData) currentUser = JSON.parse(userData);
+        } catch(e2) {}
+    }
     inicializarApp();
 }
 
@@ -198,7 +232,7 @@ async function checkConnection() {
             signal: controller.signal,
             cache: 'no-cache'
         });
-        
+
         clearTimeout(timeoutId);
 
         const wasOffline = !isOnline;
@@ -269,12 +303,9 @@ async function syncData() {
 async function loadPedidos() {
     if (!isOnline) return;
     try {
-        // Buscar apenas o mês/ano atual — sem acumular dados
         const mes = currentMonth.getMonth();
         const ano = currentMonth.getFullYear();
-        const url = `${API_URL}/pedidos?mes=${mes}&ano=${ano}`;
-
-        const response = await fetch(url, {
+        const response = await fetch(`${API_URL}/pedidos?mes=${mes}&ano=${ano}`, {
             headers: { 'X-Session-Token': sessionToken },
             cache: 'no-cache'
         });
@@ -286,7 +317,6 @@ async function loadPedidos() {
         }
 
         if (response.ok) {
-            // Substituir completamente — sem acúmulo de meses anteriores
             pedidos = await response.json();
             atualizarCacheClientes(pedidos);
             lastDataHash = JSON.stringify(pedidos.map(p => p.id));
@@ -489,11 +519,10 @@ function preencherDadosCliente(cnpj) {
 // ============================================
 function changeMonth(direction) {
     currentMonth.setMonth(currentMonth.getMonth() + direction);
-    // Descartar dados do mês anterior e buscar o novo mês
     pedidos = [];
     lastDataHash = '';
     isLoadingMonth = true;
-    updateDisplay(); // Atualiza UI imediatamente com indicador de carregamento
+    updateDisplay();
     loadPedidos().finally(() => { isLoadingMonth = false; });
 }
 
@@ -509,8 +538,7 @@ function updateMonthDisplay() {
 }
 
 function getPedidosForCurrentMonth() {
-    // Os dados em `pedidos` já foram buscados filtrados pelo mês/ano no servidor
-    return pedidos;
+    return pedidos; // já filtrados pelo servidor
 }
 
 function formatDate(dateString) {
@@ -537,7 +565,6 @@ function updateDashboard() {
     const totalEmitidos = monthPedidos.filter(p => p.status === 'emitida').length;
     const totalPendentes = monthPedidos.filter(p => p.status === 'pendente').length;
     
-    // Total de pedidos no mês (pedidos[] já está filtrado pelo mês)
     const ultimoCodigo = monthPedidos.length;
     
     const valorTotalMes = monthPedidos.reduce((acc, p) => {
@@ -614,27 +641,14 @@ function updateTable() {
     if (filtered.length === 0) {
         if (isLoadingMonth) {
             container.innerHTML = `
-                <tr>
-                    <td colspan="8" style="text-align: center; padding: 2.5rem;">
-                        <div style="display: inline-flex; align-items: center; gap: 12px; color: var(--text-secondary, #aaa);">
-                            <div style="
-                                width: 22px; height: 22px;
-                                border-radius: 50%;
-                                border: 2.5px solid transparent;
-                                border-top-color: #e07b00;
-                                border-right-color: #f5a623;
-                                border-bottom-color: transparent;
-                                border-left-color: transparent;
-                                animation: spinLoader 0.75s linear infinite;
-                                flex-shrink: 0;
-                            "></div>
-                            <span style="font-size: 0.95rem; letter-spacing: 0.01em;">Carregando...</span>
-                        </div>
-                    </td>
-                </tr>
-            `;
+                <tr><td colspan="8" style="text-align:center;padding:2.5rem;">
+                    <div style="display:inline-flex;align-items:center;gap:12px;color:var(--text-secondary,#aaa);">
+                        <div style="width:22px;height:22px;border-radius:50%;border:2.5px solid transparent;border-top-color:#e07b00;border-right-color:#f5a623;animation:spinLoader 0.75s linear infinite;flex-shrink:0;"></div>
+                        <span style="font-size:0.95rem;">Carregando...</span>
+                    </div>
+                </td></tr>`;
         } else {
-            container.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhum registro encontrado</td></tr>';
+            container.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
         }
         return;
     }
@@ -646,43 +660,54 @@ function updateTable() {
         return numA - numB;
     });
     
-    container.innerHTML = filtered.map(pedido => `
-        <tr class="${pedido.status === 'emitida' ? 'row-fechada' : ''}">
-            <td style="text-align: center;">
+    const canToggle = userCanToggleEmissao();
+
+    container.innerHTML = filtered.map(pedido => {
+        const emitida = pedido.status === 'emitida';
+        const dataEmissao = pedido.data_emissao
+            ? new Date(pedido.data_emissao).toLocaleDateString('pt-BR')
+            : '-';
+
+        const checkboxCell = canToggle
+            ? `<td style="text-align: center;">
                 <div class="checkbox-wrapper">
-                    <input type="checkbox" 
-                           class="styled-checkbox" 
+                    <input type="checkbox"
+                           class="styled-checkbox"
                            id="check-${pedido.id}"
-                           ${pedido.status === 'emitida' ? 'checked' : ''}
+                           ${emitida ? 'checked' : ''}
                            onchange="toggleEmissao('${pedido.id}', this.checked)">
                     <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
                 </div>
-            </td>
+               </td>`
+            : `<td style="text-align: center;">
+                ${emitida
+                    ? '<div style="width:40px;height:40px;border-radius:8px;background:rgba(34,197,94,0.15);border:2px solid #22C55E;display:inline-flex;align-items:center;justify-content:center;color:#22C55E;font-weight:700;">✓</div>'
+                    : '<div style="width:40px;height:40px;border-radius:8px;background:var(--input-bg);border:2px solid var(--border-color);display:inline-flex;"></div>'
+                }
+               </td>`;
+
+        return `
+        <tr class="${emitida ? 'row-fechada' : ''}">
+            ${checkboxCell}
             <td><strong>${pedido.codigo}</strong></td>
             <td>${pedido.razao_social}</td>
             <td>${formatarCNPJ(pedido.cnpj)}</td>
-            <td>${pedido.documento || '-'}</td>
+            <td>${dataEmissao}</td>
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
-                <span class="badge ${pedido.status === 'emitida' ? 'fechada' : 'aberta'}">
-                    ${pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE'}
+                <span class="badge ${emitida ? 'fechada' : 'aberta'}">
+                    ${emitida ? 'EMITIDO' : 'PENDENTE'}
                 </span>
             </td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #F59E0B;">
-                        Ver
-                    </button>
-                    <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">
-                        Editar
-                    </button>
-                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">
-                        Etiqueta
-                    </button>
+                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #F59E0B;">Ver</button>
+                    <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">Editar</button>
+                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">Etiqueta</button>
                 </div>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 // ============================================
@@ -1211,6 +1236,10 @@ function viewPedido(id) {
     const statusClass = pedido.status === 'emitida' ? 'fechada' : 'aberta';
     const statusText = pedido.status === 'emitida' ? 'FECHADA' : 'ABERTA';
     
+    const dataEmissaoFormatada = pedido.data_emissao
+        ? new Date(pedido.data_emissao).toLocaleDateString('pt-BR')
+        : '-';
+
     document.getElementById('info-tab-geral').innerHTML = `
         <div class="info-section">
             <h4>Informações Gerais</h4>
@@ -1221,6 +1250,10 @@ function viewPedido(id) {
             <div class="info-row">
                 <span class="info-label">Data:</span>
                 <span class="info-value">${pedido.data_registro ? formatarData(pedido.data_registro) : '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Data Emissão:</span>
+                <span class="info-value">${dataEmissaoFormatada}</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Status:</span>
@@ -1563,32 +1596,80 @@ function gerarEtiqueta(id) {
         showMessage('Pedido não encontrado!', 'error');
         return;
     }
-    
+
     if (!pedido.quantidade || parseInt(pedido.quantidade) === 0) {
         showMessage('Este pedido não possui quantidade total informada!', 'error');
         return;
     }
-    
-    const nf = prompt('Qual é o número da NF para este pedido?');
-    
-    if (!nf || nf.trim() === '') {
+
+    // Abrir modal de NF no lugar do prompt
+    showNFModal(id);
+}
+
+function showNFModal(pedidoId) {
+    // Remove modal anterior se existir
+    const existing = document.getElementById('nfModal');
+    if (existing) existing.remove();
+
+    const modalHTML = `
+        <div class="modal-overlay" id="nfModal" style="display:flex;">
+            <div class="modal-content modal-delete" style="max-width:420px;">
+                <button class="close-modal" onclick="closeNFModal()">✕</button>
+                <div class="modal-message-delete" style="margin-bottom:1.25rem;">
+                    Informe o número da NF para gerar as etiquetas
+                </div>
+                <div style="margin-bottom:1.5rem; padding: 0 0.25rem;">
+                    <input type="text"
+                           id="nfInput"
+                           placeholder="Número da NF"
+                           style="text-align:center; font-size:1.1rem; font-weight:600; letter-spacing:1px;"
+                           onkeydown="if(event.key==='Enter') confirmarGerarEtiqueta('${pedidoId}')">
+                </div>
+                <div class="modal-actions modal-actions-no-border">
+                    <button type="button" onclick="confirmarGerarEtiqueta('${pedidoId}')" style="background:#22C55E; min-width:140px;">Gerar Etiqueta</button>
+                    <button type="button" onclick="closeNFModal()" class="secondary" style="min-width:100px;">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    setTimeout(() => document.getElementById('nfInput')?.focus(), 100);
+}
+
+function closeNFModal() {
+    const modal = document.getElementById('nfModal');
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.2s ease forwards';
+        setTimeout(() => modal.remove(), 200);
+    }
+}
+
+function confirmarGerarEtiqueta(pedidoId) {
+    const nf = document.getElementById('nfInput')?.value?.trim();
+    if (!nf) {
+        showMessage('Informe o número da NF!', 'error');
         return;
     }
-    
+
+    closeNFModal();
+
+    const pedido = pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return;
+
     let municipio = '';
     const enderecoPartes = pedido.endereco.split(',');
-    if (enderecoPartes.length > 1) {
-        municipio = enderecoPartes[enderecoPartes.length - 1].trim();
-    } else {
-        municipio = pedido.endereco;
-    }
-    
-    const totalVolumes = parseInt(pedido.quantidade);
-    const destinatario = pedido.razao_social;
-    const endereco = pedido.endereco;
-    const infoAdicional = pedido.local_entrega || '';
-    
-    imprimirEtiquetasAutomatico(nf.trim(), totalVolumes, destinatario, municipio, endereco, infoAdicional);
+    municipio = enderecoPartes.length > 1
+        ? enderecoPartes[enderecoPartes.length - 1].trim()
+        : pedido.endereco;
+
+    imprimirEtiquetasAutomatico(
+        nf,
+        parseInt(pedido.quantidade),
+        pedido.razao_social,
+        municipio,
+        pedido.endereco,
+        pedido.local_entrega || ''
+    );
 }
 
 function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, endereco, infoAdicional) {
