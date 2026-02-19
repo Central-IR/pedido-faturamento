@@ -76,6 +76,10 @@ body {
     to { transform: rotate(360deg); }
 }
 
+@keyframes fadeOut {
+    to { opacity: 0; pointer-events: none; }
+}
+
 .splash-screen {
     position: fixed;
     top: 0;
@@ -1263,4 +1267,33 @@ button.small {
     .actions-cell {
         min-width: auto;
     }
+}
+
+/* ── Modal de NF / Delete style ────────────────────────────────────────── */
+.modal-delete {
+    text-align: center;
+    padding: 2rem 2rem 1.5rem;
+    position: relative;
+}
+
+.modal-delete .close-modal {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.modal-message-delete {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.modal-actions-no-border {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none !important;
 }
