@@ -679,10 +679,10 @@ function updateTable() {
                     <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
                 </div>
                </td>`
-            : `<td style="text-align: center; color: var(--text-secondary); font-size: 1.1rem;">
+            : `<td style="text-align: center;">
                 ${emitida
                     ? '<div style="width:40px;height:40px;border-radius:8px;background:rgba(34,197,94,0.15);border:2px solid #22C55E;display:inline-flex;align-items:center;justify-content:center;color:#22C55E;font-weight:700;">✓</div>'
-                    : '<span style="font-size:1.3rem;color:var(--text-secondary);">—</span>'
+                    : ''
                 }
                </td>`;
 
