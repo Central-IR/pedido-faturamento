@@ -23,12 +23,19 @@ const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-t
 
 
 // ── Controle de permissões ──────────────────────────────────────────────────
-const ROLES_CHECKBOX = ['administrador', 'financeiro']; // podem marcar emissão
+const ROLES_CHECKBOX = ['administrador', 'financeiro'];
+const NAMES_CHECKBOX = ['roberto', 'rosemeire', 'pollyanna'];
 
 function userCanToggleEmissao() {
     if (!currentUser) return false;
-    const role = (currentUser.role || currentUser.cargo || '').toLowerCase();
-    return ROLES_CHECKBOX.some(r => role.includes(r));
+    // Verificar por cargo/role
+    const role = (currentUser.role || currentUser.cargo || currentUser.setor || '').toLowerCase();
+    if (ROLES_CHECKBOX.some(r => role.includes(r))) return true;
+    // Verificar por nome (fallback garantido)
+    const name = (currentUser.name || currentUser.nome || currentUser.username || '').toLowerCase();
+    if (NAMES_CHECKBOX.some(n => name.includes(n))) return true;
+    console.log('🔒 Usuário sem permissão para emissão:', JSON.stringify(currentUser));
+    return false;
 }
 // ============================================
 // FUNÇÕES AUXILIARES
