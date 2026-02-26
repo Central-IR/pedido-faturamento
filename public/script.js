@@ -298,14 +298,6 @@ function updateTransportadoraSelects() {
             transportadorasCache.map(n => `<option value="${n}">${n}</option>`).join('');
         if (current) sel.value = current;
     }
-    // Atualiza o filtro de transportadora na search bar
-    const fsel = document.getElementById('filterTransportadora');
-    if (fsel) {
-        const current = fsel.value;
-        fsel.innerHTML = '<option value="">Transportadora</option>' +
-            transportadorasCache.map(n => `<option value="${n}">${n}</option>`).join('');
-        if (transportadorasCache.includes(current)) fsel.value = current;
-    }
 }
 
 // ============================================
@@ -602,7 +594,6 @@ function updateTable() {
     
     const search = document.getElementById('search').value.toLowerCase();
     const filterVendedor = document.getElementById('filterVendedor').value;
-    const filterTransportadora = document.getElementById('filterTransportadora')?.value || '';
     const filterStatus = document.getElementById('filterStatus').value;
     
     if (search) {
@@ -618,10 +609,6 @@ function updateTable() {
             (p.responsavel || '') === filterVendedor || 
             (p.vendedor || '') === filterVendedor
         );
-    }
-    
-    if (filterTransportadora) {
-        filtered = filtered.filter(p => (p.transportadora || '') === filterTransportadora);
     }
     
     if (filterStatus) {
