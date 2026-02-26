@@ -15,9 +15,10 @@ let editingId = null;
 let sessionToken = null;
 let currentTabIndex = 0;
 let currentMonth = new Date(); // Mês atual para navegação
-let isLoadingMonth = false;
 let lastDataHash = '';
 let currentUser = null; // Usuário logado (para controle de permissões)
+let currentFetchController = null;
+let transportadorasCache = [];
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
 
 
@@ -167,96 +168,32 @@ function mostrarTelaAcessoNegado(mensagem = 'NÃO AUTORIZADO') {
     `;
 }
 
-async function inicializarApp() {
-    await checkConnection();
-    
-    await Promise.all([loadPedidos(), loadEstoque()]);
-    
-    document.getElementById('cnpj')?.addEventListener('input', (e) => {
-        e.target.value = formatarCNPJ(e.target.value);
-    });
-    
-    const fieldsToUppercase = [
-        'razaoSocial', 'inscricaoEstadual', 'endereco', 'telefone', 
-        'contato', 'documento', 'localEntrega', 'setor', 
-        'transportadora', 'valorFrete'
-    ];
-    
-    fieldsToUppercase.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field) {
-            field.addEventListener('input', (e) => {
-                const start = e.target.selectionStart;
-                const end = e.target.selectionEnd;
-                e.target.value = e.target.value.toUpperCase();
-                e.target.setSelectionRange(start, end);
-            });
-        }
-    });
-    
+function inicializarApp() {
+    updateMonthDisplay();
+    loadPedidosDirectly();
+    loadEstoque();
+    loadTransportadorasCache();
+    loadAllClientesCache();
+    // Setup event listeners
     document.addEventListener('input', (e) => {
-        if (e.target.id && e.target.id.startsWith('especificacao-')) {
+        const upperIds = ['razaoSocial','inscricaoEstadual','endereco','telefone','contato','documento','localEntrega','setor','valorFrete'];
+        if (upperIds.includes(e.target.id) ||
+            (e.target.id && (e.target.id.startsWith('especificacao-') || e.target.id.startsWith('codigoEstoque-') || e.target.id.startsWith('ncm-')))) {
             const start = e.target.selectionStart;
             const end = e.target.selectionEnd;
             e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
+            try { e.target.setSelectionRange(start, end); } catch(e) {}
         }
-        if (e.target.id && e.target.id.startsWith('codigoEstoque-')) {
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
-        }
-        if (e.target.id && e.target.id.startsWith('ncm-')) {
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(start, end);
+        if (e.target.id === 'cnpj') {
+            e.target.value = formatarCNPJ(e.target.value);
         }
     });
-    
-    setInterval(checkConnection, 30000);
+    setInterval(() => { if (isOnline) loadPedidosDirectly(); }, 30000);
 }
 
 // ============================================
 // CONEXÃO COM A API
 // ============================================
-async function checkConnection() {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-        const response = await fetch(`${API_URL}/health`, {
-            method: 'GET',
-            headers: { 'X-Session-Token': sessionToken },
-            signal: controller.signal,
-            cache: 'no-cache'
-        });
-
-        clearTimeout(timeoutId);
-
-        const wasOffline = !isOnline;
-        isOnline = response.ok;
-        
-        if (wasOffline && isOnline) {
-            console.log('✅ Servidor ONLINE');
-            await loadPedidos();
-        } else if (!wasOffline && !isOnline) {
-            console.log('❌ Servidor OFFLINE');
-        }
-        
-        updateConnectionStatus();
-        return isOnline;
-    } catch (error) {
-        if (isOnline) {
-            console.log('❌ Erro de conexão:', error.message);
-        }
-        isOnline = false;
-        updateConnectionStatus();
-        return false;
-    }
-}
-
 function updateConnectionStatus() {
     const status = document.getElementById('connectionStatus');
     if (status) {
@@ -265,65 +202,109 @@ function updateConnectionStatus() {
 }
 
 async function syncData() {
-    if (!isOnline) {
-        showMessage('Você está offline. Não é possível sincronizar.', 'error');
-        return;
-    }
-    
     const btnSync = document.getElementById('btnSync');
     if (btnSync) {
+        btnSync.classList.add('syncing');
         btnSync.disabled = true;
-        btnSync.style.opacity = '0.5';
-        const svg = btnSync.querySelector('svg');
-        if (svg) {
-            svg.style.animation = 'spin 1s linear infinite';
-        }
     }
-    
     try {
-        await Promise.all([loadPedidos(), loadEstoque()]);
+        await loadPedidosDirectly();
+        await loadEstoque();
+        await loadTransportadorasCache();
         showMessage('Dados sincronizados', 'success');
     } catch (error) {
         showMessage('Erro ao sincronizar', 'error');
     } finally {
         if (btnSync) {
+            btnSync.classList.remove('syncing');
             btnSync.disabled = false;
-            btnSync.style.opacity = '1';
-            const svg = btnSync.querySelector('svg');
-            if (svg) {
-                svg.style.animation = '';
-            }
         }
     }
 }
 
 // ============================================
-// CARREGAR PEDIDOS
+// CARREGAR PEDIDOS - AbortController pattern (como Cotações de Frete)
 // ============================================
-async function loadPedidos() {
-    if (!isOnline) return;
+async function loadPedidosDirectly() {
+    if (currentFetchController) currentFetchController.abort();
+    currentFetchController = new AbortController();
+    const signal = currentFetchController.signal;
+    const mesFetch = currentMonth.getMonth();
+    const anoFetch = currentMonth.getFullYear();
     try {
-        const mes = currentMonth.getMonth();
-        const ano = currentMonth.getFullYear();
-        const response = await fetch(`${API_URL}/pedidos?mes=${mes}&ano=${ano}`, {
+        const response = await fetch(`${API_URL}/pedidos?mes=${mesFetch}&ano=${anoFetch}`, {
             headers: { 'X-Session-Token': sessionToken },
-            cache: 'no-cache'
+            cache: 'no-cache',
+            signal
         });
-
         if (response.status === 401) {
             sessionStorage.removeItem('pedidosSession');
             mostrarTelaAcessoNegado('SUA SESSÃO EXPIROU');
             return;
         }
-
-        if (response.ok) {
-            pedidos = await response.json();
-            atualizarCacheClientes(pedidos);
-            lastDataHash = JSON.stringify(pedidos.map(p => p.id));
-            updateDisplay();
+        if (!response.ok) {
+            isOnline = false;
+            updateConnectionStatus();
+            setTimeout(() => loadPedidosDirectly(), 5000);
+            return;
         }
+        const data = await response.json();
+        if (mesFetch !== currentMonth.getMonth() || anoFetch !== currentMonth.getFullYear()) return;
+        pedidos = data;
+        atualizarCacheClientes(pedidos);
+        isOnline = true;
+        updateConnectionStatus();
+        lastDataHash = JSON.stringify(pedidos.map(p => p.id));
+        currentFetchController = null;
+        updateDisplay();
     } catch (error) {
-        console.error('Erro ao carregar pedidos:', error);
+        if (error.name === 'AbortError') return;
+        isOnline = false;
+        updateConnectionStatus();
+        setTimeout(() => loadPedidosDirectly(), 5000);
+    }
+}
+
+// Alias para compatibilidade interna
+async function loadPedidos() {
+    return loadPedidosDirectly();
+}
+
+// ============================================
+// TRANSPORTADORAS — busca da app Transportadoras
+// ============================================
+async function loadTransportadorasCache() {
+    try {
+        const TRANSP_API = 'https://transportadoras.onrender.com/api';
+        const headers = { 'Accept': 'application/json', 'X-Session-Token': sessionToken };
+        const response = await fetch(`${TRANSP_API}/transportadoras?page=1&limit=200`, { headers, mode: 'cors' });
+        if (!response.ok) return;
+        const result = await response.json();
+        const lista = Array.isArray(result) ? result : (result.data || []);
+        transportadorasCache = lista.map(t => t.nome.trim().toUpperCase()).filter(Boolean).sort();
+        console.log(`🚚 ${transportadorasCache.length} transportadoras carregadas`);
+        updateTransportadoraSelects();
+    } catch (e) {
+        console.error('Erro ao carregar transportadoras:', e);
+    }
+}
+
+function updateTransportadoraSelects() {
+    // Atualiza o select no modal de formulário
+    const sel = document.getElementById('transportadora');
+    if (sel) {
+        const current = sel.value;
+        sel.innerHTML = '<option value="">Selecione...</option>' +
+            transportadorasCache.map(n => `<option value="${n}">${n}</option>`).join('');
+        if (current) sel.value = current;
+    }
+    // Atualiza o filtro de transportadora na search bar
+    const fsel = document.getElementById('filterTransportadora');
+    if (fsel) {
+        const current = fsel.value;
+        fsel.innerHTML = '<option value="">Transportadora</option>' +
+            transportadorasCache.map(n => `<option value="${n}">${n}</option>`).join('');
+        if (transportadorasCache.includes(current)) fsel.value = current;
     }
 }
 
@@ -356,13 +337,16 @@ async function loadEstoque() {
 }
 
 // ============================================
-// CACHE DE CLIENTES
+// CACHE DE CLIENTES — global, nunca zerado, sempre o mais recente por CNPJ
 // ============================================
-function atualizarCacheClientes(pedidos) {
-    clientesCache = {};
-    pedidos.forEach(pedido => {
+function atualizarCacheClientes(lista) {
+    lista.forEach(pedido => {
         const cnpj = pedido.cnpj?.trim();
-        if (cnpj && !clientesCache[cnpj]) {
+        if (!cnpj) return;
+        const existing = clientesCache[cnpj];
+        const existingDate = existing ? new Date(existing._created_at || 0) : new Date(0);
+        const newDate = new Date(pedido.created_at || 0);
+        if (!existing || newDate >= existingDate) {
             clientesCache[cnpj] = {
                 razaoSocial: pedido.razao_social,
                 inscricaoEstadual: pedido.inscricao_estadual,
@@ -379,11 +363,28 @@ function atualizarCacheClientes(pedidos) {
                 peso: pedido.peso,
                 quantidade: pedido.quantidade,
                 volumes: pedido.volumes,
-                previsaoEntrega: pedido.previsao_entrega
+                previsaoEntrega: pedido.previsao_entrega,
+                _created_at: pedido.created_at
             };
         }
     });
-    console.log(`👥 ${Object.keys(clientesCache).length} clientes em cache`);
+    console.log(`👥 ${Object.keys(clientesCache).length} clientes em cache global`);
+}
+
+// Carrega TODOS os pedidos do banco apenas para popular o cache de CNPJ
+async function loadAllClientesCache() {
+    try {
+        const response = await fetch(`${API_URL}/pedidos`, {
+            headers: { 'X-Session-Token': sessionToken },
+            cache: 'no-cache'
+        });
+        if (!response.ok) return;
+        const todos = await response.json();
+        atualizarCacheClientes(todos);
+        console.log(`📋 Cache global de clientes: ${Object.keys(clientesCache).length} CNPJs`);
+    } catch (e) {
+        console.error('Erro ao carregar cache global de clientes:', e);
+    }
 }
 
 function buscarClientePorCNPJ(cnpj) {
@@ -422,53 +423,36 @@ function buscarClientePorCNPJ(cnpj) {
 }
 
 function preencherDadosClienteCompleto(cnpj) {
-    const pedidosComCNPJ = pedidos.filter(p => p.cnpj === cnpj);
-    
-    if (pedidosComCNPJ.length === 0) {
-        preencherDadosCliente(cnpj);
+    // Usa sempre o cache global (dados mais recentes de qualquer mês)
+    const cliente = clientesCache[cnpj];
+    if (!cliente) {
+        document.getElementById('cnpjSuggestions').style.display = 'none';
         return;
     }
-    
-    const ultimoPedido = pedidosComCNPJ.sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-    )[0];
-    
     document.getElementById('cnpj').value = formatarCNPJ(cnpj);
-    document.getElementById('razaoSocial').value = ultimoPedido.razao_social || '';
-    document.getElementById('inscricaoEstadual').value = ultimoPedido.inscricao_estadual || '';
-    document.getElementById('endereco').value = ultimoPedido.endereco || '';
-    document.getElementById('telefone').value = ultimoPedido.telefone || '';
-    document.getElementById('contato').value = ultimoPedido.contato || '';
-    document.getElementById('email').value = ultimoPedido.email || '';
-    document.getElementById('documento').value = ultimoPedido.documento || '';
-    
-    if (ultimoPedido.valor_total) {
-        document.getElementById('valorTotalPedido').value = ultimoPedido.valor_total;
+    document.getElementById('razaoSocial').value = cliente.razaoSocial || '';
+    document.getElementById('inscricaoEstadual').value = cliente.inscricaoEstadual || '';
+    document.getElementById('endereco').value = cliente.endereco || '';
+    document.getElementById('telefone').value = cliente.telefone || '';
+    document.getElementById('contato').value = cliente.contato || '';
+    document.getElementById('email').value = cliente.email || '';
+    document.getElementById('documento').value = cliente.documento || '';
+    if (cliente.peso) document.getElementById('peso').value = cliente.peso;
+    if (cliente.quantidade) document.getElementById('quantidade').value = cliente.quantidade;
+    if (cliente.volumes) document.getElementById('volumes').value = cliente.volumes;
+    document.getElementById('localEntrega').value = cliente.localEntrega || '';
+    document.getElementById('setor').value = cliente.setor || '';
+    if (cliente.previsaoEntrega) document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
+    // Transportadora: preenche só se estiver no cache atual (não força valor antigo)
+    const tSel = document.getElementById('transportadora');
+    if (tSel && cliente.transportadora) {
+        // Verificar se o valor existe nas opções atuais
+        const opts = Array.from(tSel.options).map(o => o.value);
+        if (opts.includes(cliente.transportadora)) tSel.value = cliente.transportadora;
     }
-    if (ultimoPedido.peso) {
-        document.getElementById('peso').value = ultimoPedido.peso;
-    }
-    if (ultimoPedido.quantidade) {
-        document.getElementById('quantidade').value = ultimoPedido.quantidade;
-    }
-    if (ultimoPedido.volumes) {
-        document.getElementById('volumes').value = ultimoPedido.volumes;
-    }
-    
-    document.getElementById('localEntrega').value = ultimoPedido.local_entrega || '';
-    document.getElementById('setor').value = ultimoPedido.setor || '';
-    if (ultimoPedido.previsao_entrega) {
-        document.getElementById('previsaoEntrega').value = ultimoPedido.previsao_entrega;
-    }
-    
-    document.getElementById('transportadora').value = ultimoPedido.transportadora || '';
-    document.getElementById('valorFrete').value = ultimoPedido.valor_frete || '';
-    
+    document.getElementById('valorFrete').value = cliente.valorFrete || '';
     const vendedorSelect = document.getElementById('vendedor');
-    if (vendedorSelect && ultimoPedido.vendedor) {
-        vendedorSelect.value = ultimoPedido.vendedor;
-    }
-    
+    if (vendedorSelect && cliente.vendedor) vendedorSelect.value = cliente.vendedor;
     document.getElementById('cnpjSuggestions').style.display = 'none';
     showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
 }
@@ -518,12 +502,13 @@ function preencherDadosCliente(cnpj) {
 // NAVEGAÇÃO DE MESES
 // ============================================
 function changeMonth(direction) {
+    if (currentFetchController) currentFetchController.abort();
     currentMonth.setMonth(currentMonth.getMonth() + direction);
     pedidos = [];
     lastDataHash = '';
-    isLoadingMonth = true;
-    updateDisplay();
-    loadPedidos().finally(() => { isLoadingMonth = false; });
+    updateMonthDisplay();
+    updateTable();
+    loadPedidosDirectly();
 }
 
 function updateMonthDisplay() {
@@ -613,10 +598,11 @@ function filterPedidos() {
 // ============================================
 function updateTable() {
     const container = document.getElementById('pedidosContainer');
-    let filtered = getPedidosForCurrentMonth(); // Filtrar por mês primeiro
+    let filtered = getPedidosForCurrentMonth();
     
     const search = document.getElementById('search').value.toLowerCase();
     const filterVendedor = document.getElementById('filterVendedor').value;
+    const filterTransportadora = document.getElementById('filterTransportadora')?.value || '';
     const filterStatus = document.getElementById('filterStatus').value;
     
     if (search) {
@@ -634,22 +620,17 @@ function updateTable() {
         );
     }
     
+    if (filterTransportadora) {
+        filtered = filtered.filter(p => (p.transportadora || '') === filterTransportadora);
+    }
+    
     if (filterStatus) {
         filtered = filtered.filter(p => p.status === filterStatus);
     }
     
     if (filtered.length === 0) {
-        if (isLoadingMonth) {
-            container.innerHTML = `
-                <tr><td colspan="8" style="text-align:center;padding:2.5rem;">
-                    <div style="display:inline-flex;align-items:center;gap:12px;color:var(--text-secondary,#aaa);">
-                        <div style="width:22px;height:22px;border-radius:50%;border:2.5px solid transparent;border-top-color:#e07b00;border-right-color:#f5a623;animation:spinLoader 0.75s linear infinite;flex-shrink:0;"></div>
-                        <span style="font-size:0.95rem;">Carregando...</span>
-                    </div>
-                </td></tr>`;
-        } else {
-            container.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
-        }
+        if (currentFetchController) return; // fetch em andamento — não mostrar vazio ainda
+        container.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
         return;
     }
     
@@ -701,7 +682,7 @@ function updateTable() {
             </td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #F59E0B;">Ver</button>
+                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #ff521d;">Ver</button>
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">Editar</button>
                     <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">Etiqueta</button>
                 </div>
@@ -727,6 +708,8 @@ function openFormModal() {
     
     activateTab(0);
     document.getElementById('formModal').classList.add('show');
+    // Atualiza selects dinâmicos ao abrir modal
+    updateTransportadoraSelects();
 }
 
 function closeFormModal() {
@@ -1117,6 +1100,7 @@ async function editPedido(id) {
     editingId = id;
     currentTabIndex = 0;
     document.getElementById('formTitle').textContent = `Editar Pedido Nº ${pedido.codigo}`;
+    updateTransportadoraSelects();
     
     document.getElementById('codigo').value = pedido.codigo;
     document.getElementById('documento').value = pedido.documento || '';
