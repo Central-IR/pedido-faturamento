@@ -26,6 +26,25 @@ const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-t
 const ROLES_CHECKBOX = ['administrador', 'financeiro'];
 const NAMES_CHECKBOX = ['roberto', 'rosemeire', 'pollyanna'];
 
+function detectResponsavelFromUser() {
+    if (!currentUser) return '';
+    const fullName = (currentUser.name || currentUser.nome || currentUser.username || '').trim();
+    if (!fullName) return '';
+    // Retorna o primeiro nome capitalizado para corresponder às options do select
+    const firstName = fullName.split(' ')[0];
+    // Mapeamento para os valores exatos do <select>
+    const map = {
+        'roberto': 'Roberto',
+        'rosemeire': 'Rosemeire',
+        'pollyanna': 'Pollyanna',
+        'isaque': 'Isaque',
+        'gustavo': 'Gustavo',
+        'miguel': 'Miguel',
+        'luiz': 'Luiz'
+    };
+    return map[firstName.toLowerCase()] || firstName;
+}
+
 function userCanToggleEmissao() {
     if (!currentUser) return false;
     // Verificar por cargo/role
@@ -551,10 +570,12 @@ function updateDashboard() {
     
     const ultimoCodigo = monthPedidos.length;
     
-    const valorTotalMes = monthPedidos.reduce((acc, p) => {
-        const valor = parseMoeda(p.valor_total);
-        return acc + valor;
-    }, 0);
+    const valorTotalMes = monthPedidos
+        .filter(p => p.status === 'emitida')
+        .reduce((acc, p) => {
+            const valor = parseMoeda(p.valor_total);
+            return acc + valor;
+        }, 0);
     
     document.getElementById('totalPedidos').textContent = ultimoCodigo;
     document.getElementById('totalEmitidos').textContent = totalEmitidos;
@@ -700,6 +721,14 @@ function openFormModal() {
     // Set data atual
     document.getElementById('dataRegistro').value = getDataAtual();
     
+    // Auto-detectar responsável pelo usuário logado
+    const responsavelAuto = detectResponsavelFromUser();
+    const responsavelSelect = document.getElementById('responsavel');
+    if (responsavelSelect && responsavelAuto) {
+        responsavelSelect.value = responsavelAuto;
+        responsavelSelect.disabled = true;
+    }
+    
     activateTab(0);
     document.getElementById('formModal').classList.add('show');
     // Atualiza selects dinâmicos ao abrir modal
@@ -727,11 +756,7 @@ function resetForm() {
         }
     });
     
-    // Reabilitar responsavel se estava desabilitado
-    const responsavelSelect = document.getElementById('responsavel');
-    if (responsavelSelect) {
-        responsavelSelect.disabled = false;
-    }
+    // responsavel é sempre definido pelo usuário logado — não reabilitar manualmente
     
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
@@ -1591,7 +1616,7 @@ function showNFModal(pedidoId) {
 
     const modalHTML = `
         <div class="modal-overlay" id="nfModal" style="display:flex;">
-            <div class="modal-content modal-delete" style="max-width:420px;">
+            <div class="modal-content modal-delete" style="max-width:420px; min-height:260px;">
                 <button class="close-modal" onclick="closeNFModal()">✕</button>
                 <div class="modal-message-delete" style="margin-bottom:1.25rem;">
                     Informe o número da NF para gerar as etiquetas
