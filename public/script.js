@@ -1618,10 +1618,7 @@ function showNFModal(pedidoId) {
         <div class="modal-overlay" id="nfModal" style="display:flex;">
             <div class="modal-content modal-delete" style="max-width:420px; min-height:260px;">
                 <button class="close-modal" onclick="closeNFModal()">✕</button>
-                <div class="modal-message-delete" style="margin-bottom:1.25rem;">
-                    Informe o número da NF para gerar as etiquetas
-                </div>
-                <div style="margin-bottom:1.5rem; padding: 0 0.25rem;">
+                <div style="margin-bottom:1.5rem; padding: 0 0.25rem; margin-top:1rem;">
                     <input type="text"
                            id="nfInput"
                            placeholder="Número da NF"
