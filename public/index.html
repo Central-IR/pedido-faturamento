@@ -40,7 +40,7 @@
                     </div>
                     <div class="stat-content">
                         <div class="stat-value" id="totalPedidos">0</div>
-                        <div class="stat-label">Faturado</div>
+                        <div class="stat-label">Pedidos</div>
                     </div>
                 </div>
                 <div class="stat-card stat-card-success">
@@ -75,7 +75,7 @@
                     </div>
                     <div class="stat-content">
                         <div class="stat-value stat-value-info" id="valorTotal">R$ 0,00</div>
-                        <div class="stat-label">Total</div>
+                        <div class="stat-label">Faturado</div>
                     </div>
                 </div>
             </div>
@@ -94,6 +94,14 @@
                         <div class="filter-dropdown-inline">
                             <select id="filterVendedor" onchange="filterPedidos()">
                                 <option value="">Responsável</option>
+                            </select>
+                            <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="filter-dropdown-inline">
+                            <select id="filterTransportadora" onchange="filterPedidos()">
+                                <option value="">Transportadora</option>
                             </select>
                             <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -343,16 +351,7 @@
                         <div class="form-group">
                             <label for="transportadora">Transportadora</label>
                             <select id="transportadora">
-                                <option value="">Selecione...</option>
-                                <option value="TNT MERCÚRIO">TNT MERCÚRIO</option>
-                                <option value="BRASPRESS">BRASPRESS</option>
-                                <option value="GENEROSO">GENEROSO</option>
-                                <option value="CONTINENTAL">CONTINENTAL</option>
-                                <option value="JEOLOG">JEOLOG</option>
-                                <option value="TG TRANSPORTES">TG TRANSPORTES</option>
-                                <option value="MOVVI">MOVVI</option>
-                                <option value="FAVORITA TRANSPORTES">FAVORITA TRANSPORTES</option>
-                                <option value="CORREIOS">CORREIOS</option>
+                                <option value="">Carregando...</option>
                             </select>
                         </div>
                         <div class="form-group">
