@@ -1065,8 +1065,9 @@ function getItems() {
         const valorTotal = document.getElementById(`valorTotal-${id}`).value;
         const ncm = document.getElementById(`ncm-${id}`).value.trim();
         
-        // Inclui o item se tiver unidade e quantidade, mesmo sem código de estoque
-        if (unidade && quantidade > 0) {
+        // Inclui o item se tiver qualquer dado relevante preenchido (exclui linhas completamente vazias)
+        const temDados = codigoEstoque || especificacao || (unidade && unidade !== '') || quantidade > 0 || valorUnitario > 0 || ncm;
+        if (temDados) {
             items.push({
                 item: items.length + 1,
                 codigoEstoque,
@@ -1121,7 +1122,6 @@ async function savePedido() {
         contato: document.getElementById('contato').value.trim(),
         email: document.getElementById('email').value.trim().toLowerCase(),
         documento: document.getElementById('documento').value.trim(),
-        items,
         valor_total: document.getElementById('valorTotalPedido').value,
         peso: document.getElementById('peso').value,
         quantidade: document.getElementById('quantidade').value,
@@ -1133,6 +1133,10 @@ async function savePedido() {
         valor_frete: document.getElementById('valorFrete').value,
         vendedor
     };
+    // Só inclui items se houver algo — nunca enviar [] vazio em edição (apagaria os itens do banco)
+    if (items.length > 0 || !editingId) {
+        pedido.items = items;
+    }
     // Novos pedidos: adicionar responsável e status inicial
     if (!editingId) {
         pedido.responsavel = responsavel;
