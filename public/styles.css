@@ -1267,3 +1267,8 @@ button.small {
     padding-top: 0;
     border-top: none !important;
 }
+
+/* NF Modal - input spacing away from close button */
+#nfModal .modal-delete {
+    padding-top: 3.5rem;
+}
