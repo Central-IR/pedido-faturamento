@@ -1545,7 +1545,7 @@ function showReverterEmissaoModal(id) {
         <div class="modal-content modal-delete" style="max-width:440px;">
             <button class="close-modal" onclick="fecharModalReverterEmissao()">✕</button>
             <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
-                Reverter emissão do pedido ${pedido ? pedido.codigo : ''}? As quantidades retornarão ao estoque.
+                Reverter emissão do pedido ${pedido ? pedido.codigo : ''}?
             </div>
             <div class="modal-actions modal-actions-no-border">
                 <button type="button" onclick="executarReverterEmissao('${id}')" style="background:#22C55E;min-width:80px;">Sim</button>
