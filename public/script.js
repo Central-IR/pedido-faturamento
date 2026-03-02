@@ -382,6 +382,7 @@ function atualizarCacheClientes(lista) {
                 quantidade: pedido.quantidade,
                 volumes: pedido.volumes,
                 previsaoEntrega: pedido.previsao_entrega,
+                items: Array.isArray(pedido.items) ? pedido.items : [],
                 _created_at: pedido.created_at
             };
         }
@@ -471,6 +472,64 @@ function preencherDadosClienteCompleto(cnpj) {
     document.getElementById('valorFrete').value = cliente.valorFrete || '';
     const vendedorSelect = document.getElementById('vendedor');
     if (vendedorSelect && cliente.vendedor) vendedorSelect.value = cliente.vendedor;
+    // Restaurar itens do último pedido
+    if (cliente.items && Array.isArray(cliente.items) && cliente.items.length > 0) {
+        document.getElementById('itemsContainer').innerHTML = '';
+        itemCounter = 0;
+        cliente.items.forEach((item, index) => {
+            itemCounter++;
+            const container = document.getElementById('itemsContainer');
+            const tr = document.createElement('tr');
+            tr.id = `item-${itemCounter}`;
+            tr.innerHTML = `
+                <td><input type="text" value="${index + 1}" readonly style="text-align: center; width: 50px;"></td>
+                <td>
+                    <input type="text" 
+                           id="codigoEstoque-${itemCounter}" 
+                           value="${item.codigoEstoque || ''}"
+                           class="codigo-estoque"
+                           onblur="verificarEstoque(${itemCounter}); checkStockReferences()"
+                           onchange="buscarDadosEstoque(${itemCounter})">
+                </td>
+                <td><textarea id="especificacao-${itemCounter}" rows="2">${item.especificacao || ''}</textarea></td>
+                <td>
+                    <select id="unidade-${itemCounter}">
+                        <option value="">-</option>
+                        <option value="UN" ${item.unidade === 'UN' ? 'selected' : ''}>UN</option>
+                        <option value="MT" ${item.unidade === 'MT' ? 'selected' : ''}>MT</option>
+                        <option value="KG" ${item.unidade === 'KG' ? 'selected' : ''}>KG</option>
+                        <option value="PC" ${item.unidade === 'PC' ? 'selected' : ''}>PC</option>
+                        <option value="CX" ${item.unidade === 'CX' ? 'selected' : ''}>CX</option>
+                        <option value="LT" ${item.unidade === 'LT' ? 'selected' : ''}>LT</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="number" 
+                           id="quantidade-${itemCounter}" 
+                           value="${item.quantidade || ''}"
+                           min="0" step="1"
+                           onchange="calcularValorItem(${itemCounter}); verificarEstoque(${itemCounter})">
+                </td>
+                <td>
+                    <input type="number" 
+                           id="valorUnitario-${itemCounter}" 
+                           value="${item.valorUnitario || ''}"
+                           min="0" step="0.01" placeholder="0.00"
+                           onchange="calcularValorItem(${itemCounter})">
+                </td>
+                <td><input type="text" id="valorTotal-${itemCounter}" value="${item.valorTotal || ''}" readonly></td>
+                <td><input type="text" id="ncm-${itemCounter}" value="${item.ncm || ''}"></td>
+                <td>
+                    <button type="button" onclick="removeItem(${itemCounter}); checkStockReferences()" class="danger small" style="padding: 6px 10px;">
+                        ✕
+                    </button>
+                </td>
+            `;
+            container.appendChild(tr);
+        });
+        calcularTotais();
+        checkStockReferences();
+    }
     document.getElementById('cnpjSuggestions').style.display = 'none';
     showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
 }
@@ -1426,24 +1485,18 @@ async function toggleEmissao(id, checked) {
         
         const items = Array.isArray(pedido.items) ? pedido.items : [];
         
-        // Validação 2: TODOS os itens devem ter código de estoque
-        let hasItemWithoutStockCode = false;
-        for (const item of items) {
-            if (!item.codigoEstoque || item.codigoEstoque.trim() === '') {
-                hasItemWithoutStockCode = true;
-                break;
-            }
-        }
-        
-        if (hasItemWithoutStockCode || items.length === 0) {
-            showMessage('Não é possível confirmar a emissão deste pedido sem referência ao estoque', 'error');
+        // Verificar se algum item não tem código de estoque
+        let hasItemWithoutStockCode = items.length === 0 || items.some(item => !item.codigoEstoque || item.codigoEstoque.trim() === '');
+
+        if (hasItemWithoutStockCode) {
+            // Mostrar modal de confirmação de emissão sem estoque
             document.getElementById(`check-${id}`).checked = false;
+            confirmarEmissaoSemEstoque(id);
             return;
         }
-        
-        // Validação 3: Verificar se códigos existem no estoque e se há quantidade suficiente
+
+        // Verificar se códigos existem no estoque e se há quantidade suficiente
         let estoqueInsuficiente = false;
-        
         for (const item of items) {
             const itemEstoque = estoqueCache[item.codigoEstoque];
             if (!itemEstoque) {
@@ -1451,142 +1504,217 @@ async function toggleEmissao(id, checked) {
                 document.getElementById(`check-${id}`).checked = false;
                 return;
             }
-            
             const quantidadeDisponivel = parseFloat(itemEstoque.quantidade) || 0;
             if (item.quantidade > quantidadeDisponivel) {
                 showMessage(`A quantidade em estoque para o item ${item.codigoEstoque} é insuficiente para atender o pedido`, 'error');
                 estoqueInsuficiente = true;
             }
         }
-        
         if (estoqueInsuficiente) {
             document.getElementById(`check-${id}`).checked = false;
             return;
         }
+
+        // Confirmação padrão
+        showConfirmarEmissaoModal(id);
+        return;
         
-        // Confirmação do usuário
-        if (!confirm(`Confirmar emissão para o pedido ${pedido.codigo}?`)) {
-            document.getElementById(`check-${id}`).checked = false;
-            return;
-        }
-        
-        try {
-            const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '0.5';
-                checkboxLabel.style.pointerEvents = 'none';
-            }
-            
-            // Debitar estoque
-            for (const item of items) {
-                const itemEstoque = estoqueCache[item.codigoEstoque];
-                const novaQuantidade = parseFloat(itemEstoque.quantidade) - item.quantidade;
-                
-                const response = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
-                    },
-                    body: JSON.stringify({
-                        quantidade: novaQuantidade
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Erro ao atualizar estoque');
-            }
-            
-            // Atualizar status do pedido
-            const response = await fetch(`${API_URL}/pedidos/${id}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': sessionToken
-                },
-                body: JSON.stringify({
-                    status: 'emitida',
-                    data_emissao: new Date().toISOString()
-                })
-            });
-            
-            if (!response.ok) throw new Error('Erro ao atualizar pedido');
-            
-            await Promise.all([loadPedidos(), loadEstoque()]);
-            
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '1';
-                checkboxLabel.style.pointerEvents = 'auto';
-            }
-            
-            showMessage(`Pedido de Faturamento ${pedido.codigo} Emitido`, 'success');
-        } catch (error) {
-            console.error('Erro ao emitir:', error);
-            showMessage('Erro ao emitir pedido', 'error');
-            document.getElementById(`check-${id}`).checked = false;
-        }
+        // Emissão com estoque confirmada via modal
+        showConfirmarEmissaoModal(id);
+        return;
     } else if (!checked && pedido.status === 'emitida') {
-        if (!confirm(`Reverter emissão do pedido ${pedido.codigo}?\n\nAs quantidades retornarão ao estoque.`)) {
-            document.getElementById(`check-${id}`).checked = true;
-            return;
-        }
+        document.getElementById(`check-${id}`).checked = true;
+        showReverterEmissaoModal(id);
+        return;
         
-        try {
-            const items = Array.isArray(pedido.items) ? pedido.items : [];
-            
-            const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '0.5';
-                checkboxLabel.style.pointerEvents = 'none';
-            }
-            
-            // Devolver ao estoque
-            for (const item of items) {
-                const itemEstoque = estoqueCache[item.codigoEstoque];
-                if (!itemEstoque) continue;
-                
-                const novaQuantidade = parseFloat(itemEstoque.quantidade) + item.quantidade;
-                
-                const response = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Token': sessionToken
-                    },
-                    body: JSON.stringify({
-                        quantidade: novaQuantidade
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Erro ao atualizar estoque');
-            }
-            
-            const response = await fetch(`${API_URL}/pedidos/${id}`, {
+    }
+}
+
+// ============================================
+// MODAIS DE CONFIRMAÇÃO DE EMISSÃO
+// ============================================
+function showReverterEmissaoModal(id) {
+    const existing = document.getElementById('modalReverterEmissao');
+    if (existing) existing.remove();
+    const pedido = pedidos.find(p => p.id === id);
+    const modal = document.createElement('div');
+    modal.id = 'modalReverterEmissao';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content modal-delete" style="max-width:440px;">
+            <button class="close-modal" onclick="fecharModalReverterEmissao()">✕</button>
+            <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
+                Reverter emissão do pedido ${pedido ? pedido.codigo : ''}? As quantidades retornarão ao estoque.
+            </div>
+            <div class="modal-actions modal-actions-no-border">
+                <button type="button" onclick="executarReverterEmissao('${id}')" style="background:#22C55E;min-width:80px;">Sim</button>
+                <button type="button" onclick="fecharModalReverterEmissao()" style="background:#EF4444;min-width:80px;">Não</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function fecharModalReverterEmissao() {
+    const modal = document.getElementById('modalReverterEmissao');
+    if (modal) modal.remove();
+}
+
+async function executarReverterEmissao(id) {
+    fecharModalReverterEmissao();
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) return;
+    try {
+        const items = Array.isArray(pedido.items) ? pedido.items : [];
+        const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
+        if (checkboxLabel) { checkboxLabel.style.opacity = '0.5'; checkboxLabel.style.pointerEvents = 'none'; }
+        for (const item of items) {
+            if (!item.codigoEstoque) continue;
+            const itemEstoque = estoqueCache[item.codigoEstoque];
+            if (!itemEstoque) continue;
+            const novaQuantidade = parseFloat(itemEstoque.quantidade) + item.quantidade;
+            const resp = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': sessionToken
-                },
-                body: JSON.stringify({
-                    status: 'pendente',
-                    data_emissao: null
-                })
+                headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+                body: JSON.stringify({ quantidade: novaQuantidade })
             });
-            
-            if (!response.ok) throw new Error('Erro ao atualizar pedido');
-            
-            await Promise.all([loadPedidos(), loadEstoque()]);
-            
-            if (checkboxLabel) {
-                checkboxLabel.style.opacity = '1';
-                checkboxLabel.style.pointerEvents = 'auto';
-            }
-            
-            showMessage(`Emissão do pedido ${pedido.codigo} revertida!`, 'success');
-        } catch (error) {
-            console.error('Erro ao reverter:', error);
-            showMessage('Erro ao reverter emissão!', 'error');
-            document.getElementById(`check-${id}`).checked = true;
+            if (!resp.ok) throw new Error('Erro ao atualizar estoque');
         }
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+            body: JSON.stringify({ status: 'pendente', data_emissao: null })
+        });
+        if (!response.ok) throw new Error('Erro ao atualizar pedido');
+        await Promise.all([loadPedidos(), loadEstoque()]);
+        if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
+        showMessage(`Emissão do pedido ${pedido.codigo} revertida!`, 'success');
+    } catch (error) {
+        console.error('Erro ao reverter:', error);
+        showMessage('Erro ao reverter emissão!', 'error');
+        const cb = document.getElementById(`check-${id}`);
+        if (cb) cb.checked = true;
+    }
+}
+
+function confirmarEmissaoSemEstoque(pedidoId) {
+    const existing = document.getElementById('modalSemEstoque');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'modalSemEstoque';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content modal-delete" style="max-width:440px;">
+            <button class="close-modal" onclick="fecharModalSemEstoque()">✕</button>
+            <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
+                O estoque não foi incluído para este pedido. Deseja confirmar esta emissão?
+            </div>
+            <div class="modal-actions modal-actions-no-border">
+                <button type="button" onclick="executarEmissaoSemEstoque('${pedidoId}')" style="background:#22C55E;min-width:80px;">Sim</button>
+                <button type="button" onclick="fecharModalSemEstoque()" style="background:#EF4444;min-width:80px;">Não</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function fecharModalSemEstoque() {
+    const modal = document.getElementById('modalSemEstoque');
+    if (modal) modal.remove();
+}
+
+function showConfirmarEmissaoModal(pedidoId) {
+    const existing = document.getElementById('modalConfirmarEmissao');
+    if (existing) existing.remove();
+
+    const pedido = pedidos.find(p => p.id === pedidoId);
+    const modal = document.createElement('div');
+    modal.id = 'modalConfirmarEmissao';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content modal-delete" style="max-width:440px;">
+            <button class="close-modal" onclick="fecharModalConfirmarEmissao()">✕</button>
+            <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
+                Confirmar emissão para o pedido ${pedido ? pedido.codigo : ''}?
+            </div>
+            <div class="modal-actions modal-actions-no-border">
+                <button type="button" onclick="executarEmissao('${pedidoId}')" style="background:#22C55E;min-width:80px;">Sim</button>
+                <button type="button" onclick="fecharModalConfirmarEmissao()" style="background:#EF4444;min-width:80px;">Não</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function fecharModalConfirmarEmissao() {
+    const modal = document.getElementById('modalConfirmarEmissao');
+    if (modal) modal.remove();
+}
+
+async function executarEmissaoSemEstoque(id) {
+    fecharModalSemEstoque();
+    // Emissão sem debitar estoque
+    try {
+        const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
+        if (checkboxLabel) { checkboxLabel.style.opacity = '0.5'; checkboxLabel.style.pointerEvents = 'none'; }
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+            body: JSON.stringify({ status: 'emitida', data_emissao: new Date().toISOString() })
+        });
+        if (!response.ok) throw new Error('Erro ao atualizar pedido');
+        const pedido = pedidos.find(p => p.id === id);
+        await Promise.all([loadPedidos(), loadEstoque()]);
+        if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
+        showMessage(`Pedido de Faturamento ${pedido ? pedido.codigo : ''} Emitido`, 'success');
+    } catch (error) {
+        console.error('Erro ao emitir:', error);
+        showMessage('Erro ao emitir pedido', 'error');
+        const cb = document.getElementById(`check-${id}`);
+        if (cb) cb.checked = false;
+    }
+}
+
+async function executarEmissao(id) {
+    fecharModalConfirmarEmissao();
+    const pedido = pedidos.find(p => p.id === id);
+    if (!pedido) return;
+    const items = Array.isArray(pedido.items) ? pedido.items : [];
+    try {
+        const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
+        if (checkboxLabel) { checkboxLabel.style.opacity = '0.5'; checkboxLabel.style.pointerEvents = 'none'; }
+        // Debitar estoque
+        for (const item of items) {
+            if (!item.codigoEstoque) continue;
+            const itemEstoque = estoqueCache[item.codigoEstoque];
+            if (!itemEstoque) continue;
+            const novaQuantidade = parseFloat(itemEstoque.quantidade) - item.quantidade;
+            const resp = await fetch(`${API_URL}/estoque/${itemEstoque.codigo}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+                body: JSON.stringify({ quantidade: novaQuantidade })
+            });
+            if (!resp.ok) throw new Error('Erro ao atualizar estoque');
+        }
+        // Atualizar status
+        const response = await fetch(`${API_URL}/pedidos/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+            body: JSON.stringify({ status: 'emitida', data_emissao: new Date().toISOString() })
+        });
+        if (!response.ok) throw new Error('Erro ao atualizar pedido');
+        await Promise.all([loadPedidos(), loadEstoque()]);
+        if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
+        showMessage(`Pedido de Faturamento ${pedido.codigo} Emitido`, 'success');
+    } catch (error) {
+        console.error('Erro ao emitir:', error);
+        showMessage('Erro ao emitir pedido', 'error');
+        const cb = document.getElementById(`check-${id}`);
+        if (cb) cb.checked = false;
     }
 }
 
@@ -1627,7 +1755,7 @@ function showNFModal(pedidoId) {
                 </div>
                 <div class="modal-actions modal-actions-no-border">
                     <button type="button" onclick="confirmarGerarEtiqueta('${pedidoId}')" style="background:#22C55E; min-width:140px;">Gerar Etiqueta</button>
-                    <button type="button" onclick="closeNFModal()" class="secondary" style="min-width:100px;">Cancelar</button>
+                    <button type="button" onclick="closeNFModal()" class="cancel-close" style="min-width:100px;">Cancelar</button>
                 </div>
             </div>
         </div>
