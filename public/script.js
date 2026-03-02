@@ -79,7 +79,12 @@ function formatarMoeda(valor) {
 
 function parseMoeda(valor) {
     if (!valor) return 0;
-    return parseFloat(valor.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+    // Remove tudo exceto dígitos, vírgula e ponto; trata vírgula como separador decimal
+    const cleaned = String(valor)
+        .replace(/[^\d.,]/g, '')   // mantém apenas dígitos, . e ,
+        .replace(/\.(?=\d{3}[,.])/g, '') // remove pontos de milhar (ex: 1.234,56)
+        .replace(',', '.');         // converte vírgula decimal para ponto
+    return parseFloat(cleaned) || 0;
 }
 
 function showMessage(message, type = 'success') {
@@ -794,15 +799,17 @@ function openFormModal() {
     updateTransportadoraSelects();
 }
 
-function closeFormModal() {
+function closeFormModal(silent = false) {
     const isEditing = editingId !== null;
     document.getElementById('formModal').classList.remove('show');
     resetForm();
     
-    if (isEditing) {
-        showMessage('Atualização cancelada', 'error');
-    } else {
-        showMessage('Pedido cancelado', 'error');
+    if (!silent) {
+        if (isEditing) {
+            showMessage('Atualização cancelada', 'error');
+        } else {
+            showMessage('Pedido cancelado', 'error');
+        }
     }
 }
 
@@ -1058,7 +1065,8 @@ function getItems() {
         const valorTotal = document.getElementById(`valorTotal-${id}`).value;
         const ncm = document.getElementById(`ncm-${id}`).value.trim();
         
-        if (codigoEstoque && unidade && quantidade > 0) {
+        // Inclui o item se tiver unidade e quantidade, mesmo sem código de estoque
+        if (unidade && quantidade > 0) {
             items.push({
                 item: items.length + 1,
                 codigoEstoque,
@@ -1123,10 +1131,13 @@ async function savePedido() {
         previsao_entrega: document.getElementById('previsaoEntrega').value || null,
         transportadora: document.getElementById('transportadora').value.trim(),
         valor_frete: document.getElementById('valorFrete').value,
-        vendedor,
-        responsavel: editingId ? undefined : responsavel, // Somente adiciona responsável em novos pedidos
-        status: 'pendente'
+        vendedor
     };
+    // Novos pedidos: adicionar responsável e status inicial
+    if (!editingId) {
+        pedido.responsavel = responsavel;
+        pedido.status = 'pendente';
+    }
     
     // Só adiciona data_registro em novos pedidos
     if (!editingId) {
@@ -1154,10 +1165,11 @@ async function savePedido() {
             throw new Error('Erro ao salvar pedido');
         }
         
+        const wasEditing = !!editingId;
         await loadPedidos();
-        closeFormModal();
+        closeFormModal(true); // silent: não mostrar toast de cancelamento
         
-        if (editingId) {
+        if (wasEditing) {
             showMessage(`Pedido ${codigo} atualizado`, 'success');
         } else {
             showMessage(`Pedido ${codigo} registrado`, 'success');
@@ -1460,12 +1472,14 @@ function closeInfoModal() {
     document.getElementById('infoModal').classList.remove('show');
 }
 
-function switchInfoTab(tabId) {
+function switchInfoTab(tabId, btn) {
     document.querySelectorAll('#infoModal .tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('#infoModal .tab-btn').forEach(btn => btn.classList.remove('active'));
-    
+    document.querySelectorAll('#infoModal .tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
+    // Ativar o botão correto: via parâmetro, evento global ou busca por texto
+    const activeBtn = btn || (typeof event !== 'undefined' && event?.target) ||
+        Array.from(document.querySelectorAll('#infoModal .tab-btn')).find(b => b.getAttribute('onclick')?.includes(tabId));
+    if (activeBtn) activeBtn.classList.add('active');
 }
 
 // ============================================
@@ -1515,11 +1529,7 @@ async function toggleEmissao(id, checked) {
             return;
         }
 
-        // Confirmação padrão
-        showConfirmarEmissaoModal(id);
-        return;
-        
-        // Emissão com estoque confirmada via modal
+        // Confirmação via modal
         showConfirmarEmissaoModal(id);
         return;
     } else if (!checked && pedido.status === 'emitida') {
