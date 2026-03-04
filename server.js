@@ -78,6 +78,34 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==============================
+// ROTA PARA ÚLTIMA NF
+// ==============================
+app.get('/api/ultima-nf', verificarAutenticacao, async (req, res) => {
+    try {
+        const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=nf&order=nf.desc.nullslast&limit=1`,
+            {
+                headers: {
+                    apikey: SUPABASE_KEY,
+                    Authorization: `Bearer ${SUPABASE_KEY}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Erro ao buscar última NF');
+        }
+
+        const data = await response.json();
+        const ultimaNF = data[0]?.nf || 0;
+        res.json({ ultimaNF });
+    } catch (error) {
+        console.error('Erro ao obter última NF:', error);
+        res.status(500).json({ error: 'Erro ao buscar última NF' });
+    }
+});
+
+// ==============================
 // ROTAS PROTEGIDAS – PEDIDOS
 // ==============================
 app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
@@ -86,7 +114,7 @@ app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
         let supabaseUrl;
 
         if (mes !== undefined && ano !== undefined) {
-            const month = parseInt(mes); // 0-based (Janeiro = 0)
+            const month = parseInt(mes);
             const year = parseInt(ano);
             const startDate = new Date(year, month, 1);
             const endDate = new Date(year, month + 1, 0);
@@ -126,7 +154,7 @@ app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
 app.post('/api/pedidos', verificarAutenticacao, async (req, res) => {
     try {
         console.log('📝 POST /api/pedidos - Criando pedido:', req.body.codigo);
-        
+
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos_faturamento`,
             {
@@ -238,7 +266,7 @@ app.get('/api/estoque', verificarAutenticacao, async (req, res) => {
 app.patch('/api/estoque/:codigo', verificarAutenticacao, async (req, res) => {
     try {
         console.log(`Atualizando estoque código ${req.params.codigo}:`, req.body);
-        
+
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/estoque?codigo=eq.${req.params.codigo}`,
             {
@@ -286,5 +314,5 @@ app.listen(PORT, () => {
     console.log('📦 Supabase conectado com Service Role');
     console.log('💾 Tabela: pedidos_faturamento');
     console.log('📊 Estoque: Atualização por código');
-    console.log('✨ Novas colunas: responsavel, data_registro');
+    console.log('✨ Novas colunas: responsavel, data_registro, nf');
 });
