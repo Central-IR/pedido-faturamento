@@ -14,9 +14,9 @@ let estoqueCache = {};
 let editingId = null;
 let sessionToken = null;
 let currentTabIndex = 0;
-let currentMonth = new Date(); // Mês atual para navegação
+let currentMonth = new Date();
 let lastDataHash = '';
-let currentUser = null; // Usuário logado (para controle de permissões)
+let currentUser = null;
 let currentFetchController = null;
 let transportadorasCache = [];
 const tabs = ['tab-geral', 'tab-faturamento', 'tab-itens', 'tab-entrega', 'tab-transporte'];
@@ -30,9 +30,7 @@ function detectResponsavelFromUser() {
     if (!currentUser) return '';
     const fullName = (currentUser.name || currentUser.nome || currentUser.username || '').trim();
     if (!fullName) return '';
-    // Retorna o primeiro nome capitalizado para corresponder às options do select
     const firstName = fullName.split(' ')[0];
-    // Mapeamento para os valores exatos do <select>
     const map = {
         'roberto': 'Roberto',
         'rosemeire': 'Rosemeire',
@@ -47,10 +45,8 @@ function detectResponsavelFromUser() {
 
 function userCanToggleEmissao() {
     if (!currentUser) return false;
-    // Verificar por cargo/role
     const role = (currentUser.role || currentUser.cargo || currentUser.setor || '').toLowerCase();
     if (ROLES_CHECKBOX.some(r => role.includes(r))) return true;
-    // Verificar por nome (fallback garantido)
     const name = (currentUser.name || currentUser.nome || currentUser.username || '').toLowerCase();
     if (NAMES_CHECKBOX.some(n => name.includes(n))) return true;
     console.log('🔒 Usuário sem permissão para emissão:', JSON.stringify(currentUser));
@@ -79,11 +75,10 @@ function formatarMoeda(valor) {
 
 function parseMoeda(valor) {
     if (!valor) return 0;
-    // Remove tudo exceto dígitos, vírgula e ponto; trata vírgula como separador decimal
     const cleaned = String(valor)
-        .replace(/[^\d.,]/g, '')   // mantém apenas dígitos, . e ,
-        .replace(/\.(?=\d{3}[,.])/g, '') // remove pontos de milhar (ex: 1.234,56)
-        .replace(',', '.');         // converte vírgula decimal para ponto
+        .replace(/[^\d.,]/g, '')
+        .replace(/\.(?=\d{3}[,.])/g, '')
+        .replace(',', '.');
     return parseFloat(cleaned) || 0;
 }
 
@@ -139,7 +134,6 @@ async function verificarAutenticacao() {
         return;
     }
 
-    // Verificar sessão e capturar dados do usuário (cargo/role)
     try {
         const verifyRes = await fetch(`${PORTAL_URL}/api/verify-session`, {
             method: 'POST',
@@ -157,7 +151,6 @@ async function verificarAutenticacao() {
             }
         }
     } catch(e) {
-        // Fallback: tentar do cache local
         try {
             const userData = sessionStorage.getItem('pedidosUserData');
             if (userData) currentUser = JSON.parse(userData);
@@ -205,7 +198,6 @@ function inicializarApp() {
     loadEstoque();
     loadTransportadorasCache();
     loadAllClientesCache();
-    // Setup event listeners
     document.addEventListener('input', (e) => {
         const upperIds = ['razaoSocial','inscricaoEstadual','endereco','telefone','contato','documento','localEntrega','setor','valorFrete'];
         if (upperIds.includes(e.target.id) ||
@@ -254,7 +246,7 @@ async function syncData() {
 }
 
 // ============================================
-// CARREGAR PEDIDOS - AbortController pattern (como Cotações de Frete)
+// CARREGAR PEDIDOS
 // ============================================
 async function loadPedidosDirectly() {
     if (currentFetchController) currentFetchController.abort();
@@ -296,13 +288,12 @@ async function loadPedidosDirectly() {
     }
 }
 
-// Alias para compatibilidade interna
 async function loadPedidos() {
     return loadPedidosDirectly();
 }
 
 // ============================================
-// TRANSPORTADORAS — busca da app Transportadoras
+// TRANSPORTADORAS
 // ============================================
 async function loadTransportadorasCache() {
     try {
@@ -321,7 +312,6 @@ async function loadTransportadorasCache() {
 }
 
 function updateTransportadoraSelects() {
-    // Atualiza o select no modal de formulário
     const sel = document.getElementById('transportadora');
     if (sel) {
         const current = sel.value;
@@ -360,7 +350,7 @@ async function loadEstoque() {
 }
 
 // ============================================
-// CACHE DE CLIENTES — global, nunca zerado, sempre o mais recente por CNPJ
+// CACHE DE CLIENTES
 // ============================================
 function atualizarCacheClientes(lista) {
     lista.forEach(pedido => {
@@ -395,7 +385,6 @@ function atualizarCacheClientes(lista) {
     console.log(`👥 ${Object.keys(clientesCache).length} clientes em cache global`);
 }
 
-// Carrega TODOS os pedidos do banco apenas para popular o cache de CNPJ
 async function loadAllClientesCache() {
     try {
         const response = await fetch(`${API_URL}/pedidos`, {
@@ -447,7 +436,6 @@ function buscarClientePorCNPJ(cnpj) {
 }
 
 function preencherDadosClienteCompleto(cnpj) {
-    // Usa sempre o cache global (dados mais recentes de qualquer mês)
     const cliente = clientesCache[cnpj];
     if (!cliente) {
         document.getElementById('cnpjSuggestions').style.display = 'none';
@@ -467,17 +455,14 @@ function preencherDadosClienteCompleto(cnpj) {
     document.getElementById('localEntrega').value = cliente.localEntrega || '';
     document.getElementById('setor').value = cliente.setor || '';
     if (cliente.previsaoEntrega) document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
-    // Transportadora: preenche só se estiver no cache atual (não força valor antigo)
     const tSel = document.getElementById('transportadora');
     if (tSel && cliente.transportadora) {
-        // Verificar se o valor existe nas opções atuais
         const opts = Array.from(tSel.options).map(o => o.value);
         if (opts.includes(cliente.transportadora)) tSel.value = cliente.transportadora;
     }
     document.getElementById('valorFrete').value = cliente.valorFrete || '';
     const vendedorSelect = document.getElementById('vendedor');
     if (vendedorSelect && cliente.vendedor) vendedorSelect.value = cliente.vendedor;
-    // Restaurar itens do último pedido
     if (cliente.items && Array.isArray(cliente.items) && cliente.items.length > 0) {
         document.getElementById('itemsContainer').innerHTML = '';
         itemCounter = 0;
@@ -539,47 +524,6 @@ function preencherDadosClienteCompleto(cnpj) {
     showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
 }
 
-function preencherDadosCliente(cnpj) {
-    const cliente = clientesCache[cnpj];
-    if (!cliente) return;
-    
-    document.getElementById('cnpj').value = formatarCNPJ(cnpj);
-    document.getElementById('razaoSocial').value = cliente.razaoSocial;
-    document.getElementById('inscricaoEstadual').value = cliente.inscricaoEstadual || '';
-    document.getElementById('endereco').value = cliente.endereco;
-    document.getElementById('telefone').value = cliente.telefone || '';
-    document.getElementById('contato').value = cliente.contato || '';
-    document.getElementById('email').value = cliente.email || '';
-    document.getElementById('documento').value = cliente.documento || '';
-    
-    if (cliente.peso) {
-        document.getElementById('peso').value = cliente.peso;
-    }
-    if (cliente.quantidade) {
-        document.getElementById('quantidade').value = cliente.quantidade;
-    }
-    if (cliente.volumes) {
-        document.getElementById('volumes').value = cliente.volumes;
-    }
-    
-    document.getElementById('localEntrega').value = cliente.localEntrega || '';
-    document.getElementById('setor').value = cliente.setor || '';
-    if (cliente.previsaoEntrega) {
-        document.getElementById('previsaoEntrega').value = cliente.previsaoEntrega;
-    }
-    
-    document.getElementById('transportadora').value = cliente.transportadora || '';
-    document.getElementById('valorFrete').value = cliente.valorFrete || '';
-    
-    const vendedorSelect = document.getElementById('vendedor');
-    if (vendedorSelect && cliente.vendedor) {
-        vendedorSelect.value = cliente.vendedor;
-    }
-    
-    document.getElementById('cnpjSuggestions').style.display = 'none';
-    showMessage('Dados do cliente preenchidos automaticamente!', 'success');
-}
-
 // ============================================
 // NAVEGAÇÃO DE MESES
 // ============================================
@@ -605,7 +549,7 @@ function updateMonthDisplay() {
 }
 
 function getPedidosForCurrentMonth() {
-    return pedidos; // já filtrados pelo servidor
+    return pedidos;
 }
 
 function formatDate(dateString) {
@@ -625,7 +569,7 @@ function updateDisplay() {
 }
 
 // ============================================
-// ATUALIZAR DASHBOARD (POR MÊS)
+// ATUALIZAR DASHBOARD
 // ============================================
 function updateDashboard() {
     const monthPedidos = getPedidosForCurrentMonth();
@@ -646,6 +590,7 @@ function updateDashboard() {
     document.getElementById('totalPendentes').textContent = totalPendentes;
     document.getElementById('valorTotal').textContent = formatarMoeda(valorTotalMes);
 }
+
 function updateVendedoresFilter() {
     const vendedores = new Set();
     pedidos.forEach(p => {
@@ -691,7 +636,6 @@ function updateTable() {
     if (search) {
         filtered = filtered.filter(p => 
             p.codigo?.toString().includes(search) ||
-            (p.cnpj || '').toLowerCase().includes(search) ||
             (p.razao_social || '').toLowerCase().includes(search)
         );
     }
@@ -708,12 +652,11 @@ function updateTable() {
     }
     
     if (filtered.length === 0) {
-        if (currentFetchController) return; // fetch em andamento — não mostrar vazio ainda
+        if (currentFetchController) return;
         container.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
         return;
     }
     
-    // Ordenar por código (crescente)
     filtered.sort((a, b) => {
         const numA = parseInt(a.codigo);
         const numB = parseInt(b.codigo);
@@ -750,8 +693,8 @@ function updateTable() {
         <tr class="${emitida ? 'row-fechada' : ''}">
             ${checkboxCell}
             <td><strong>${pedido.codigo}</strong></td>
+            <td>${pedido.nf || '-'}</td> <!-- Exibe NF -->
             <td>${pedido.razao_social}</td>
-            <td>${formatarCNPJ(pedido.cnpj)}</td>
             <td>${dataEmissao}</td>
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
             <td>
@@ -773,29 +716,46 @@ function updateTable() {
 // ============================================
 // MODAL DE FORMULÁRIO
 // ============================================
-function openFormModal() {
+async function openFormModal() {
     editingId = null;
     currentTabIndex = 0;
     document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
     resetForm();
-    
+
+    // Buscar o último número de NF
+    try {
+        const response = await fetch(`${API_URL}/ultima-nf`, {
+            headers: { 'X-Session-Token': sessionToken }
+        });
+        if (response.ok) {
+            const { ultimaNF } = await response.json();
+            document.getElementById('nf').value = ultimaNF + 1;
+        } else {
+            document.getElementById('nf').value = 1;
+        }
+    } catch (error) {
+        console.error('Erro ao buscar última NF:', error);
+        document.getElementById('nf').value = 1;
+    }
+
     const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => parseInt(p.codigo) || 0)) : 0;
     document.getElementById('codigo').value = (maxCodigo + 1).toString();
-    
-    // Set data atual
+
     document.getElementById('dataRegistro').value = getDataAtual();
-    
-    // Auto-detectar responsável pelo usuário logado
+
     const responsavelAuto = detectResponsavelFromUser();
     const responsavelSelect = document.getElementById('responsavel');
     if (responsavelSelect && responsavelAuto) {
         responsavelSelect.value = responsavelAuto;
         responsavelSelect.disabled = true;
     }
-    
+
+    // Controlar edição da NF conforme permissão
+    const nfInput = document.getElementById('nf');
+    nfInput.readOnly = !userCanToggleEmissao();
+
     activateTab(0);
     document.getElementById('formModal').classList.add('show');
-    // Atualiza selects dinâmicos ao abrir modal
     updateTransportadoraSelects();
 }
 
@@ -817,12 +777,10 @@ function resetForm() {
     document.querySelectorAll('#formModal input:not([type="checkbox"]), #formModal textarea, #formModal select').forEach(input => {
         if (input.type === 'checkbox') {
             input.checked = false;
-        } else if (input.id !== 'codigo' && input.id !== 'dataRegistro') {
+        } else if (input.id !== 'codigo' && input.id !== 'dataRegistro' && input.id !== 'nf') {
             input.value = '';
         }
     });
-    
-    // responsavel é sempre definido pelo usuário logado — não reabilitar manualmente
     
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
@@ -1065,7 +1023,6 @@ function getItems() {
         const valorTotal = document.getElementById(`valorTotal-${id}`).value;
         const ncm = document.getElementById(`ncm-${id}`).value.trim();
         
-        // Inclui o item se tiver qualquer dado relevante preenchido (exclui linhas completamente vazias)
         const temDados = codigoEstoque || especificacao || (unidade && unidade !== '') || quantidade > 0 || valorUnitario > 0 || ncm;
         if (temDados) {
             items.push({
@@ -1087,22 +1044,21 @@ function getItems() {
 // SALVAR PEDIDO
 // ============================================
 async function savePedido() {
-    // Validação do responsável
     const responsavel = document.getElementById('responsavel').value.trim();
     if (!responsavel && !editingId) {
         showMessage('Por favor, selecione um responsável!', 'error');
-        activateTab(0); // Volta para a aba Geral
+        activateTab(0);
         return;
     }
     
     const codigo = document.getElementById('codigo').value.trim();
+    const nf = document.getElementById('nf').value ? parseInt(document.getElementById('nf').value) : null;
     const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
     const razaoSocial = document.getElementById('razaoSocial').value.trim();
     const endereco = document.getElementById('endereco').value.trim();
     const vendedor = document.getElementById('vendedor').value.trim();
     const items = getItems();
     
-    // Validação de CNPJ para salvar
     if (!cnpj || !razaoSocial || !endereco) {
         showMessage('CNPJ, Razão Social e Endereço são obrigatórios!', 'error');
         return;
@@ -1110,6 +1066,7 @@ async function savePedido() {
     
     const pedido = {
         codigo,
+        nf,
         cnpj,
         razao_social: razaoSocial,
         inscricao_estadual: document.getElementById('inscricaoEstadual').value.trim(),
@@ -1133,17 +1090,16 @@ async function savePedido() {
         valor_frete: document.getElementById('valorFrete').value,
         vendedor
     };
-    // Só inclui items se houver algo — nunca enviar [] vazio em edição (apagaria os itens do banco)
+    
     if (items.length > 0 || !editingId) {
         pedido.items = items;
     }
-    // Novos pedidos: adicionar responsável e status inicial
+    
     if (!editingId) {
         pedido.responsavel = responsavel;
         pedido.status = 'pendente';
     }
     
-    // Só adiciona data_registro em novos pedidos
     if (!editingId) {
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
@@ -1171,7 +1127,7 @@ async function savePedido() {
         
         const wasEditing = !!editingId;
         await loadPedidos();
-        closeFormModal(true); // silent: não mostrar toast de cancelamento
+        closeFormModal(true);
         
         if (wasEditing) {
             showMessage(`Pedido ${codigo} atualizado`, 'success');
@@ -1197,16 +1153,15 @@ async function editPedido(id) {
     updateTransportadoraSelects();
     
     document.getElementById('codigo').value = pedido.codigo;
+    document.getElementById('nf').value = pedido.nf || '';
     document.getElementById('documento').value = pedido.documento || '';
     
-    // Preencher responsável (somente visualização, não editável)
     if (pedido.responsavel) {
         const responsavelSelect = document.getElementById('responsavel');
         responsavelSelect.value = pedido.responsavel;
-        responsavelSelect.disabled = true; // Desabilita edição
+        responsavelSelect.disabled = true;
     }
     
-    // Preencher data de registro
     if (pedido.data_registro) {
         document.getElementById('dataRegistro').value = formatarData(pedido.data_registro);
     }
@@ -1232,6 +1187,10 @@ async function editPedido(id) {
     if (vendedorSelect && pedido.vendedor) {
         vendedorSelect.value = pedido.vendedor;
     }
+    
+    // Aplicar permissão para editar NF
+    const nfInput = document.getElementById('nf');
+    nfInput.readOnly = !userCanToggleEmissao();
     
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
@@ -1310,7 +1269,6 @@ function viewPedido(id) {
     
     document.getElementById('modalCodigo').textContent = pedido.codigo;
     
-    // Formatar status badge
     const statusClass = pedido.status === 'emitida' ? 'fechada' : 'aberta';
     const statusText = pedido.status === 'emitida' ? 'FECHADA' : 'ABERTA';
     
@@ -1321,6 +1279,10 @@ function viewPedido(id) {
     document.getElementById('info-tab-geral').innerHTML = `
         <div class="info-section">
             <h4>Informações Gerais</h4>
+            <div class="info-row">
+                <span class="info-label">Nº NF:</span>
+                <span class="info-value">${pedido.nf || '-'}</span>
+            </div>
             <div class="info-row">
                 <span class="info-label">Responsável:</span>
                 <span class="info-value">${pedido.responsavel || pedido.vendedor || '-'}</span>
@@ -1480,19 +1442,18 @@ function switchInfoTab(tabId, btn) {
     document.querySelectorAll('#infoModal .tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('#infoModal .tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    // Ativar o botão correto: via parâmetro, evento global ou busca por texto
     const activeBtn = btn || (typeof event !== 'undefined' && event?.target) ||
         Array.from(document.querySelectorAll('#infoModal .tab-btn')).find(b => b.getAttribute('onclick')?.includes(tabId));
     if (activeBtn) activeBtn.classList.add('active');
 }
 
 // ============================================
-// TOGGLE EMISSÃO (DEBITAR ESTOQUE)
+// TOGGLE EMISSÃO (DEBITAR ESTOQUE) - SEM MODAIS
 // ============================================
 async function toggleEmissao(id, checked) {
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
-    
+
     if (checked && pedido.status === 'pendente') {
         // Validação 1: Informações básicas
         if (!pedido.cnpj || !pedido.razao_social || !pedido.endereco) {
@@ -1500,22 +1461,22 @@ async function toggleEmissao(id, checked) {
             document.getElementById(`check-${id}`).checked = false;
             return;
         }
-        
-        const items = Array.isArray(pedido.items) ? pedido.items : [];
-        
-        // Verificar se algum item não tem código de estoque
-        let hasItemWithoutStockCode = items.length === 0 || items.some(item => !item.codigoEstoque || item.codigoEstoque.trim() === '');
 
-        if (hasItemWithoutStockCode) {
-            // Mostrar modal de confirmação de emissão sem estoque
-            document.getElementById(`check-${id}`).checked = false;
-            confirmarEmissaoSemEstoque(id);
+        const items = Array.isArray(pedido.items) ? pedido.items : [];
+
+        // Verificar se algum item tem código de estoque
+        const hasStockCode = items.some(item => item.codigoEstoque && item.codigoEstoque.trim() !== '');
+
+        if (!hasStockCode) {
+            // Emissão sem estoque: apenas atualiza status, sem debitar
+            await executarEmissaoSemEstoque(id);
             return;
         }
 
         // Verificar se códigos existem no estoque e se há quantidade suficiente
         let estoqueInsuficiente = false;
         for (const item of items) {
+            if (!item.codigoEstoque) continue;
             const itemEstoque = estoqueCache[item.codigoEstoque];
             if (!itemEstoque) {
                 showMessage(`Código ${item.codigoEstoque} não encontrado no estoque`, 'error');
@@ -1533,50 +1494,16 @@ async function toggleEmissao(id, checked) {
             return;
         }
 
-        // Confirmação via modal
-        showConfirmarEmissaoModal(id);
-        return;
+        // Emissão normal com estoque
+        await executarEmissao(id);
     } else if (!checked && pedido.status === 'emitida') {
+        // Reverter emissão
         document.getElementById(`check-${id}`).checked = true;
-        showReverterEmissaoModal(id);
-        return;
-        
+        await executarReverterEmissao(id);
     }
 }
 
-// ============================================
-// MODAIS DE CONFIRMAÇÃO DE EMISSÃO
-// ============================================
-function showReverterEmissaoModal(id) {
-    const existing = document.getElementById('modalReverterEmissao');
-    if (existing) existing.remove();
-    const pedido = pedidos.find(p => p.id === id);
-    const modal = document.createElement('div');
-    modal.id = 'modalReverterEmissao';
-    modal.className = 'modal-overlay';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal-content modal-delete" style="max-width:440px;">
-            <button class="close-modal" onclick="fecharModalReverterEmissao()">✕</button>
-            <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
-                Reverter emissão do pedido ${pedido ? pedido.codigo : ''}?
-            </div>
-            <div class="modal-actions modal-actions-no-border">
-                <button type="button" onclick="executarReverterEmissao('${id}')" style="background:#22C55E;min-width:80px;">Sim</button>
-                <button type="button" onclick="fecharModalReverterEmissao()" style="background:#EF4444;min-width:80px;">Não</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function fecharModalReverterEmissao() {
-    const modal = document.getElementById('modalReverterEmissao');
-    if (modal) modal.remove();
-}
-
 async function executarReverterEmissao(id) {
-    fecharModalReverterEmissao();
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
     try {
@@ -1612,79 +1539,26 @@ async function executarReverterEmissao(id) {
     }
 }
 
-function confirmarEmissaoSemEstoque(pedidoId) {
-    const existing = document.getElementById('modalSemEstoque');
-    if (existing) existing.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'modalSemEstoque';
-    modal.className = 'modal-overlay';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal-content modal-delete" style="max-width:440px;">
-            <button class="close-modal" onclick="fecharModalSemEstoque()">✕</button>
-            <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
-                O estoque não foi incluído para este pedido. Deseja confirmar esta emissão?
-            </div>
-            <div class="modal-actions modal-actions-no-border">
-                <button type="button" onclick="executarEmissaoSemEstoque('${pedidoId}')" style="background:#22C55E;min-width:80px;">Sim</button>
-                <button type="button" onclick="fecharModalSemEstoque()" style="background:#EF4444;min-width:80px;">Não</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function fecharModalSemEstoque() {
-    const modal = document.getElementById('modalSemEstoque');
-    if (modal) modal.remove();
-}
-
-function showConfirmarEmissaoModal(pedidoId) {
-    const existing = document.getElementById('modalConfirmarEmissao');
-    if (existing) existing.remove();
-
-    const pedido = pedidos.find(p => p.id === pedidoId);
-    const modal = document.createElement('div');
-    modal.id = 'modalConfirmarEmissao';
-    modal.className = 'modal-overlay';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="modal-content modal-delete" style="max-width:440px;">
-            <button class="close-modal" onclick="fecharModalConfirmarEmissao()">✕</button>
-            <div class="modal-message-delete" style="margin-top:1rem;margin-bottom:1.5rem;">
-                Confirmar emissão para o pedido ${pedido ? pedido.codigo : ''}?
-            </div>
-            <div class="modal-actions modal-actions-no-border">
-                <button type="button" onclick="executarEmissao('${pedidoId}')" style="background:#22C55E;min-width:80px;">Sim</button>
-                <button type="button" onclick="fecharModalConfirmarEmissao()" style="background:#EF4444;min-width:80px;">Não</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function fecharModalConfirmarEmissao() {
-    const modal = document.getElementById('modalConfirmarEmissao');
-    if (modal) modal.remove();
-}
-
 async function executarEmissaoSemEstoque(id) {
-    fecharModalSemEstoque();
-    // Emissão sem debitar estoque
     try {
+        const pedido = pedidos.find(p => p.id === id);
+        if (!pedido) return;
+
         const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
         if (checkboxLabel) { checkboxLabel.style.opacity = '0.5'; checkboxLabel.style.pointerEvents = 'none'; }
+
         const response = await fetch(`${API_URL}/pedidos/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
             body: JSON.stringify({ status: 'emitida', data_emissao: new Date().toISOString() })
         });
+
         if (!response.ok) throw new Error('Erro ao atualizar pedido');
-        const pedido = pedidos.find(p => p.id === id);
-        await Promise.all([loadPedidos(), loadEstoque()]);
+
+        await loadPedidos();
+
         if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
-        showMessage(`Pedido de Faturamento ${pedido ? pedido.codigo : ''} Emitido`, 'success');
+        showMessage(`Pedido ${pedido.codigo} emitido sem referência de estoque`, 'error'); // mensagem vermelha
     } catch (error) {
         console.error('Erro ao emitir:', error);
         showMessage('Erro ao emitir pedido', 'error');
@@ -1694,13 +1568,14 @@ async function executarEmissaoSemEstoque(id) {
 }
 
 async function executarEmissao(id) {
-    fecharModalConfirmarEmissao();
     const pedido = pedidos.find(p => p.id === id);
     if (!pedido) return;
     const items = Array.isArray(pedido.items) ? pedido.items : [];
+
     try {
         const checkboxLabel = document.querySelector(`label[for="check-${id}"]`);
         if (checkboxLabel) { checkboxLabel.style.opacity = '0.5'; checkboxLabel.style.pointerEvents = 'none'; }
+
         // Debitar estoque
         for (const item of items) {
             if (!item.codigoEstoque) continue;
@@ -1714,16 +1589,23 @@ async function executarEmissao(id) {
             });
             if (!resp.ok) throw new Error('Erro ao atualizar estoque');
         }
+
         // Atualizar status
         const response = await fetch(`${API_URL}/pedidos/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
             body: JSON.stringify({ status: 'emitida', data_emissao: new Date().toISOString() })
         });
+
         if (!response.ok) throw new Error('Erro ao atualizar pedido');
+
         await Promise.all([loadPedidos(), loadEstoque()]);
+
         if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
-        showMessage(`Pedido de Faturamento ${pedido.codigo} Emitido`, 'success');
+
+        // Mensagem com códigos descontados
+        const codigosDescontados = items.map(i => i.codigoEstoque).filter(Boolean).join(', ');
+        showMessage(`Pedido ${pedido.codigo} emitido. ${codigosDescontados} descontado do estoque.`, 'success');
     } catch (error) {
         console.error('Erro ao emitir:', error);
         showMessage('Erro ao emitir pedido', 'error');
@@ -1747,12 +1629,10 @@ function gerarEtiqueta(id) {
         return;
     }
 
-    // Abrir modal de NF no lugar do prompt
     showNFModal(id);
 }
 
 function showNFModal(pedidoId) {
-    // Remove modal anterior se existir
     const existing = document.getElementById('nfModal');
     if (existing) existing.remove();
 
