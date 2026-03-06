@@ -670,27 +670,37 @@ function updateTable() {
             ? new Date(pedido.data_emissao).toLocaleDateString('pt-BR')
             : '-';
 
-        const checkboxCell = canToggle
-            ? `<td style="text-align: center;">
-                <div class="checkbox-wrapper">
-                    <input type="checkbox"
-                           class="styled-checkbox"
-                           id="check-${pedido.id}"
-                           ${emitida ? 'checked' : ''}
-                           onchange="toggleEmissao('${pedido.id}', this.checked)">
-                    <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
-                </div>
-               </td>`
-            : `<td style="text-align: center;">
-                ${emitida
-                    ? '<div style="width:40px;height:40px;border-radius:8px;background:rgba(34,197,94,0.15);border:2px solid #22C55E;display:inline-flex;align-items:center;justify-content:center;color:#22C55E;font-weight:700;">✓</div>'
-                    : ''
-                }
-               </td>`;
+        // Define o conteúdo da primeira célula baseado na permissão
+        let firstCell;
+        if (canToggle) {
+            // Usuário com permissão: exibe checkbox interativo
+            firstCell = `
+                <td style="text-align: center;">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox"
+                               class="styled-checkbox"
+                               id="check-${pedido.id}"
+                               ${emitida ? 'checked' : ''}
+                               onchange="toggleEmissao('${pedido.id}', this.checked)">
+                        <label for="check-${pedido.id}" class="checkbox-label-styled"></label>
+                    </div>
+                </td>
+            `;
+        } else {
+            // Usuário sem permissão: exibe apenas ícone visual se emitido, senão vazio
+            firstCell = `
+                <td style="text-align: center;">
+                    ${emitida
+                        ? '<div style="width:40px;height:40px;border-radius:8px;background:rgba(34,197,94,0.15);border:2px solid #22C55E;display:inline-flex;align-items:center;justify-content:center;color:#22C55E;font-weight:700;">✓</div>'
+                        : ''
+                    }
+                </td>
+            `;
+        }
 
         return `
         <tr class="${emitida ? 'row-fechada' : ''}" data-id="${pedido.id}" style="cursor:pointer;">
-            ${checkboxCell}
+            ${firstCell}
             <td><strong>${pedido.codigo}</strong></td>
             <td>${pedido.razao_social}</td>
             <td>${dataEmissao}</td>
@@ -740,7 +750,6 @@ async function openFormModal() {
             const { proximoCodigo } = await response.json();
             document.getElementById('codigo').value = proximoCodigo;
         } else {
-            // fallback (improvável)
             document.getElementById('codigo').value = 'ERRO';
         }
     } catch (error) {
@@ -1222,7 +1231,7 @@ function viewPedido(id) {
     document.getElementById('modalCodigo').textContent = pedido.codigo;
     
     const statusClass = pedido.status === 'emitida' ? 'fechada' : 'aberta';
-    // ALTERADO: texto do status igual ao da tabela
+    // Texto do status ajustado para EMITIDO / PENDENTE (igual à tabela)
     const statusText = pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE';
     
     const dataEmissaoFormatada = pedido.data_emissao
@@ -1397,7 +1406,7 @@ function switchInfoTab(tabId, btn) {
 }
 
 // ============================================
-// TOGGLE EMISSÃO (DEBITAR ESTOQUE) - SEM MODAIS
+// TOGGLE EMISSÃO (DEBITAR ESTOQUE)
 // ============================================
 async function toggleEmissao(id, checked) {
     const pedido = pedidos.find(p => p.id === id);
@@ -1507,7 +1516,7 @@ async function executarEmissaoSemEstoque(id) {
         await loadPedidos();
 
         if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
-        showMessage(`Pedido ${pedido.codigo} emitido sem referência de estoque`, 'error'); // mensagem vermelha
+        showMessage(`Pedido ${pedido.codigo} emitido sem referência de estoque`, 'error');
     } catch (error) {
         console.error('Erro ao emitir:', error);
         showMessage('Erro ao emitir pedido', 'error');
@@ -1552,7 +1561,6 @@ async function executarEmissao(id) {
 
         if (checkboxLabel) { checkboxLabel.style.opacity = '1'; checkboxLabel.style.pointerEvents = 'auto'; }
 
-        // Mensagem com códigos descontados
         const codigosDescontados = items.map(i => i.codigoEstoque).filter(Boolean).join(', ');
         showMessage(`Pedido ${pedido.codigo} emitido. ${codigosDescontados} descontado do estoque.`, 'success');
     } catch (error) {
@@ -1564,7 +1572,7 @@ async function executarEmissao(id) {
 }
 
 // ============================================
-// GERAR ETIQUETA AUTOMÁTICA (MANTIDA)
+// GERAR ETIQUETA AUTOMÁTICA (com modal para NF)
 // ============================================
 function gerarEtiqueta(id) {
     const pedido = pedidos.find(p => p.id === id);
@@ -1578,13 +1586,66 @@ function gerarEtiqueta(id) {
         return;
     }
 
-    // Usa o código do pedido como referência
-    const numeroReferencia = pedido.codigo;
+    showNFModal(id);
+}
+
+function showNFModal(pedidoId) {
+    const existing = document.getElementById('nfModal');
+    if (existing) existing.remove();
+
+    const modalHTML = `
+        <div class="modal-overlay" id="nfModal" style="display:flex;">
+            <div class="modal-content modal-delete" style="max-width:420px; min-height:260px;">
+                <button class="close-modal" onclick="closeNFModal()">✕</button>
+                <div style="margin-bottom:1.5rem; padding: 0 0.25rem; margin-top:1rem;">
+                    <input type="text"
+                           id="nfInput"
+                           placeholder="Número da NF"
+                           style="text-align:center; font-size:1.1rem; font-weight:600; letter-spacing:1px;"
+                           onkeydown="if(event.key==='Enter') confirmarGerarEtiqueta('${pedidoId}')">
+                </div>
+                <div class="modal-actions modal-actions-no-border">
+                    <button type="button" onclick="confirmarGerarEtiqueta('${pedidoId}')" style="background:#22C55E; min-width:140px;">Gerar Etiqueta</button>
+                    <button type="button" onclick="closeNFModal()" class="cancel-close" style="min-width:100px;">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    setTimeout(() => document.getElementById('nfInput')?.focus(), 100);
+}
+
+function closeNFModal() {
+    const modal = document.getElementById('nfModal');
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.2s ease forwards';
+        setTimeout(() => modal.remove(), 200);
+    }
+}
+
+function confirmarGerarEtiqueta(pedidoId) {
+    const nf = document.getElementById('nfInput')?.value?.trim();
+    if (!nf) {
+        showMessage('Informe o número da NF!', 'error');
+        return;
+    }
+
+    closeNFModal();
+
+    const pedido = pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return;
+
+    let municipio = '';
+    const enderecoPartes = pedido.endereco.split(',');
+    municipio = enderecoPartes.length > 1
+        ? enderecoPartes[enderecoPartes.length - 1].trim()
+        : pedido.endereco;
+
     imprimirEtiquetasAutomatico(
-        numeroReferencia,
+        nf,
         parseInt(pedido.quantidade),
         pedido.razao_social,
-        '', // município pode ser extraído do endereço se desejado
+        municipio,
         pedido.endereco,
         pedido.local_entrega || ''
     );
@@ -1604,7 +1665,7 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
                     </div>
                 </div>
                 <div class='nf-volume-container'>
-                    <div class='nf-volume'>Pedido: ${nf}</div>
+                    <div class='nf-volume'>NF: ${nf}</div>
                     <div class='volume'>VOLUME: ${i}/${totalVolumes}</div>
                 </div>
                 <hr>
@@ -1621,7 +1682,7 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
     printWindow.document.write(`
         <html>
         <head>
-            <title>Etiquetas Pedido ${nf}</title>
+            <title>Etiquetas NF ${nf}</title>
             <style>
                 @page {
                     size: 100mm 150mm;
@@ -1714,5 +1775,5 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
     `);
     printWindow.document.close();
     
-    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para o Pedido ${nf}`, 'success');
+    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
 }
