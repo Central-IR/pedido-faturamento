@@ -622,10 +622,11 @@ function filterPedidos() {
 }
 
 // ============================================
-// ATUALIZAR TABELA
+// ATUALIZAR TABELA (MODIFICADA)
 // ============================================
 function updateTable() {
     const container = document.getElementById('pedidosContainer');
+    const thead = document.querySelector('thead');
     let filtered = getPedidosForCurrentMonth();
     
     const search = document.getElementById('search').value.toLowerCase();
@@ -650,9 +651,42 @@ function updateTable() {
         filtered = filtered.filter(p => p.status === filterStatus);
     }
     
+    const canToggle = userCanToggleEmissao();
+
+    // Define o cabeçalho dinamicamente
+    let headerHtml;
+    if (canToggle) {
+        headerHtml = `
+            <tr>
+                <th style="width: 40px; text-align: center;">
+                    <span style="font-size: 1.1rem;">✓</span>
+                </th>
+                <th>Nº Pedido</th>
+                <th>Razão Social</th>
+                <th>Data Emissão</th>
+                <th>Valor Total</th>
+                <th>Status</th>
+                <th style="text-align: center;">Ações</th>
+            </tr>
+        `;
+    } else {
+        headerHtml = `
+            <tr>
+                <th>Nº Pedido</th>
+                <th>Razão Social</th>
+                <th>Data Emissão</th>
+                <th>Valor Total</th>
+                <th>Status</th>
+                <th style="text-align: center;">Ações</th>
+            </tr>
+        `;
+    }
+    thead.innerHTML = headerHtml;
+
     if (filtered.length === 0) {
         if (currentFetchController) return;
-        container.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
+        const colspan = canToggle ? 7 : 6;
+        container.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>`;
         return;
     }
     
@@ -661,8 +695,6 @@ function updateTable() {
         const numB = parseInt(b.codigo);
         return numA - numB;
     });
-    
-    const canToggle = userCanToggleEmissao();
 
     container.innerHTML = filtered.map(pedido => {
         const emitida = pedido.status === 'emitida';
@@ -670,10 +702,8 @@ function updateTable() {
             ? new Date(pedido.data_emissao).toLocaleDateString('pt-BR')
             : '-';
 
-        // Define o conteúdo da primeira célula baseado na permissão
-        let firstCell;
+        let firstCell = '';
         if (canToggle) {
-            // Usuário com permissão: exibe checkbox interativo
             firstCell = `
                 <td style="text-align: center;">
                     <div class="checkbox-wrapper">
@@ -686,43 +716,53 @@ function updateTable() {
                     </div>
                 </td>
             `;
-        } else {
-            // Usuário sem permissão: exibe apenas ícone visual se emitido, senão vazio
-            firstCell = `
-                <td style="text-align: center;">
-                    ${emitida
-                        ? '<div style="width:40px;height:40px;border-radius:8px;background:rgba(34,197,94,0.15);border:2px solid #22C55E;display:inline-flex;align-items:center;justify-content:center;color:#22C55E;font-weight:700;">✓</div>'
-                        : ''
-                    }
-                </td>
-            `;
         }
 
-        return `
-        <tr class="${emitida ? 'row-fechada' : ''}" data-id="${pedido.id}" style="cursor:pointer;">
-            ${firstCell}
-            <td><strong>${pedido.codigo}</strong></td>
-            <td>${pedido.razao_social}</td>
-            <td>${dataEmissao}</td>
-            <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
-            <td>
-                <span class="badge ${emitida ? 'fechada' : 'aberta'}">
-                    ${emitida ? 'EMITIDO' : 'PENDENTE'}
-                </span>
-            </td>
+        const actions = `
             <td>
                 <div class="actions">
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">Editar</button>
                     <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">Etiqueta</button>
                 </div>
             </td>
-        </tr>`;
+        `;
+
+        // Monta a linha conforme a permissão
+        if (canToggle) {
+            return `
+            <tr class="${emitida ? 'row-fechada' : ''}" data-id="${pedido.id}" style="cursor:pointer;">
+                ${firstCell}
+                <td><strong>${pedido.codigo}</strong></td>
+                <td>${pedido.razao_social}</td>
+                <td>${dataEmissao}</td>
+                <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
+                <td>
+                    <span class="badge ${emitida ? 'fechada' : 'aberta'}">
+                        ${emitida ? 'EMITIDO' : 'PENDENTE'}
+                    </span>
+                </td>
+                ${actions}
+            </tr>`;
+        } else {
+            return `
+            <tr class="${emitida ? 'row-fechada' : ''}" data-id="${pedido.id}" style="cursor:pointer;">
+                <td><strong>${pedido.codigo}</strong></td>
+                <td>${pedido.razao_social}</td>
+                <td>${dataEmissao}</td>
+                <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
+                <td>
+                    <span class="badge ${emitida ? 'fechada' : 'aberta'}">
+                        ${emitida ? 'EMITIDO' : 'PENDENTE'}
+                    </span>
+                </td>
+                ${actions}
+            </tr>`;
+        }
     }).join('');
 
     // Adiciona evento de clique nas linhas para abrir o modal de visualização
     document.querySelectorAll('#pedidosContainer tr').forEach(tr => {
         tr.addEventListener('click', function(e) {
-            // Se o clique foi em um botão ou checkbox, não abre o modal
             if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input')) {
                 return;
             }
