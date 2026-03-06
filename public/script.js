@@ -478,7 +478,7 @@ function preencherDadosClienteCompleto(cnpj) {
                            id="codigoEstoque-${itemCounter}" 
                            value="${item.codigoEstoque || ''}"
                            class="codigo-estoque"
-                           onblur="verificarEstoque(${itemCounter}); checkStockReferences()"
+                           onblur="verificarEstoque(${itemCounter})"
                            onchange="buscarDadosEstoque(${itemCounter})">
                 </td>
                 <td><textarea id="especificacao-${itemCounter}" rows="2">${item.especificacao || ''}</textarea></td>
@@ -510,7 +510,7 @@ function preencherDadosClienteCompleto(cnpj) {
                 <td><input type="text" id="valorTotal-${itemCounter}" value="${item.valorTotal || ''}" readonly></td>
                 <td><input type="text" id="ncm-${itemCounter}" value="${item.ncm || ''}"></td>
                 <td>
-                    <button type="button" onclick="removeItem(${itemCounter}); checkStockReferences()" class="danger small" style="padding: 6px 10px;">
+                    <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
                         ✕
                     </button>
                 </td>
@@ -518,7 +518,6 @@ function preencherDadosClienteCompleto(cnpj) {
             container.appendChild(tr);
         });
         calcularTotais();
-        checkStockReferences();
     }
     document.getElementById('cnpjSuggestions').style.display = 'none';
     showMessage('Dados do último pedido preenchidos automaticamente!', 'success');
@@ -789,7 +788,6 @@ function resetForm() {
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
     addItem();
-    hideStockWarning();
 }
 
 // ============================================
@@ -856,7 +854,7 @@ function addItem() {
                    id="codigoEstoque-${itemCounter}" 
                    class="codigo-estoque"
                    placeholder="CÓDIGO"
-                   onblur="verificarEstoque(${itemCounter}); checkStockReferences()"
+                   onblur="verificarEstoque(${itemCounter})"
                    onchange="buscarDadosEstoque(${itemCounter})">
         </td>
         <td><textarea id="especificacao-${itemCounter}" rows="2"></textarea></td>
@@ -889,7 +887,7 @@ function addItem() {
         <td><input type="text" id="valorTotal-${itemCounter}" readonly></td>
         <td><input type="text" id="ncm-${itemCounter}"></td>
         <td>
-            <button type="button" onclick="removeItem(${itemCounter}); checkStockReferences()" class="danger small" style="padding: 6px 10px;">
+            <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
                 ✕
             </button>
         </td>
@@ -971,47 +969,6 @@ function verificarEstoque(itemId) {
     
     if (quantidadeSolicitada > quantidadeDisponivel) {
         showMessage(`Esta quantidade não corresponde ao estoque do item ${codigo}`, 'error');
-    }
-}
-
-function checkStockReferences() {
-    let allItemsHaveStockCode = true;
-    let hasItems = false;
-    
-    document.querySelectorAll('[id^="item-"]').forEach(item => {
-        const id = item.id.replace('item-', '');
-        const codigoInput = document.getElementById(`codigoEstoque-${id}`);
-        const unidadeSelect = document.getElementById(`unidade-${id}`);
-        const quantidadeInput = document.getElementById(`quantidade-${id}`);
-        
-        if (unidadeSelect?.value && quantidadeInput?.value && parseFloat(quantidadeInput.value) > 0) {
-            hasItems = true;
-            if (!codigoInput?.value.trim()) {
-                allItemsHaveStockCode = false;
-            }
-        }
-    });
-    
-    if (hasItems && !allItemsHaveStockCode) {
-        showStockWarning();
-    } else {
-        hideStockWarning();
-    }
-    
-    return allItemsHaveStockCode || !hasItems;
-}
-
-function showStockWarning() {
-    const warning = document.getElementById('stockWarning');
-    if (warning) {
-        warning.classList.remove('hidden');
-    }
-}
-
-function hideStockWarning() {
-    const warning = document.getElementById('stockWarning');
-    if (warning) {
-        warning.classList.add('hidden');
     }
 }
 
@@ -1208,7 +1165,7 @@ async function editPedido(id) {
                            id="codigoEstoque-${itemCounter}" 
                            value="${item.codigoEstoque || ''}"
                            class="codigo-estoque"
-                           onblur="verificarEstoque(${itemCounter}); checkStockReferences()"
+                           onblur="verificarEstoque(${itemCounter})"
                            onchange="buscarDadosEstoque(${itemCounter})">
                 </td>
                 <td><textarea id="especificacao-${itemCounter}" rows="2">${item.especificacao || ''}</textarea></td>
@@ -1242,7 +1199,7 @@ async function editPedido(id) {
                 <td><input type="text" id="valorTotal-${itemCounter}" value="${item.valorTotal || 'R$ 0,00'}" readonly></td>
                 <td><input type="text" id="ncm-${itemCounter}" value="${item.ncm || ''}"></td>
                 <td>
-                    <button type="button" onclick="removeItem(${itemCounter}); checkStockReferences()" class="danger small" style="padding: 6px 10px;">
+                    <button type="button" onclick="removeItem(${itemCounter})" class="danger small" style="padding: 6px 10px;">
                         ✕
                     </button>
                 </td>
@@ -1253,8 +1210,6 @@ async function editPedido(id) {
     
     activateTab(0);
     document.getElementById('formModal').classList.add('show');
-    
-    checkStockReferences();
 }
 
 // ============================================
@@ -1267,7 +1222,8 @@ function viewPedido(id) {
     document.getElementById('modalCodigo').textContent = pedido.codigo;
     
     const statusClass = pedido.status === 'emitida' ? 'fechada' : 'aberta';
-    const statusText = pedido.status === 'emitida' ? 'FECHADA' : 'ABERTA';
+    // ALTERADO: texto do status igual ao da tabela
+    const statusText = pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE';
     
     const dataEmissaoFormatada = pedido.data_emissao
         ? new Date(pedido.data_emissao).toLocaleDateString('pt-BR')
@@ -1622,7 +1578,7 @@ function gerarEtiqueta(id) {
         return;
     }
 
-    // Como o campo NF foi removido, vamos usar o código do pedido como referência
+    // Usa o código do pedido como referência
     const numeroReferencia = pedido.codigo;
     imprimirEtiquetasAutomatico(
         numeroReferencia,
