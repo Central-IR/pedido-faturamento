@@ -198,6 +198,22 @@ function inicializarApp() {
     loadEstoque();
     loadTransportadorasCache();
     loadAllClientesCache();
+    
+    // Listener para salvar com Enter no modal de formulário
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const formModal = document.getElementById('formModal');
+            if (formModal && formModal.classList.contains('show')) {
+                // Não salvar se o foco estiver em um textarea (para permitir quebra de linha)
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.tagName !== 'TEXTAREA') {
+                    e.preventDefault(); // evita qualquer comportamento padrão indesejado
+                    savePedido();
+                }
+            }
+        }
+    });
+
     document.addEventListener('input', (e) => {
         const upperIds = ['razaoSocial','inscricaoEstadual','endereco','telefone','contato','documento','localEntrega','setor','valorFrete'];
         if (upperIds.includes(e.target.id) ||
@@ -622,7 +638,7 @@ function filterPedidos() {
 }
 
 // ============================================
-// ATUALIZAR TABELA (MODIFICADA)
+// ATUALIZAR TABELA (com botão etiqueta azul marinho)
 // ============================================
 function updateTable() {
     const container = document.getElementById('pedidosContainer');
@@ -718,16 +734,16 @@ function updateTable() {
             `;
         }
 
+        // Botão etiqueta agora com azul marinho (#1E3A8A)
         const actions = `
             <td>
                 <div class="actions">
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">Editar</button>
-                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">Etiqueta</button>
+                    <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #1E3A8A;">Etiqueta</button>
                 </div>
             </td>
         `;
 
-        // Monta a linha conforme a permissão
         if (canToggle) {
             return `
             <tr class="${emitida ? 'row-fechada' : ''}" data-id="${pedido.id}" style="cursor:pointer;">
@@ -1271,7 +1287,6 @@ function viewPedido(id) {
     document.getElementById('modalCodigo').textContent = pedido.codigo;
     
     const statusClass = pedido.status === 'emitida' ? 'fechada' : 'aberta';
-    // Texto do status ajustado para EMITIDO / PENDENTE (igual à tabela)
     const statusText = pedido.status === 'emitida' ? 'EMITIDO' : 'PENDENTE';
     
     const dataEmissaoFormatada = pedido.data_emissao
