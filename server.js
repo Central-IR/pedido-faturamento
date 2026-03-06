@@ -78,31 +78,10 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==============================
-// ROTA PARA PRÓXIMO CÓDIGO (usando sequence)
+// ROTA PARA PRÓXIMO CÓDIGO (mantida, mas não usada no frontend)
 // ==============================
 app.get('/api/proximo-codigo', verificarAutenticacao, async (req, res) => {
     try {
-        // Tenta usar a função RPC next_codigo (se criada)
-        const rpcResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/rpc/next_codigo`,
-            {
-                method: 'POST',
-                headers: {
-                    apikey: SUPABASE_KEY,
-                    Authorization: `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({})
-            }
-        );
-
-        if (rpcResponse.ok) {
-            const data = await rpcResponse.json();
-            return res.json({ proximoCodigo: data });
-        }
-
-        // Fallback: consulta manual
-        console.log('⚠️ Função next_codigo não disponível, usando fallback');
         const maxResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=codigo&order=codigo.desc&limit=1`,
             {
@@ -174,7 +153,31 @@ app.get('/api/pedidos', verificarAutenticacao, async (req, res) => {
 
 app.post('/api/pedidos', verificarAutenticacao, async (req, res) => {
     try {
-        console.log('📝 POST /api/pedidos - Criando pedido:', req.body.codigo);
+        let pedidoData = { ...req.body };
+
+        // Se não veio código (novo pedido), gera automaticamente
+        if (!pedidoData.codigo) {
+            const maxResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=codigo&order=codigo.desc&limit=1`,
+                {
+                    headers: {
+                        apikey: SUPABASE_KEY,
+                        Authorization: `Bearer ${SUPABASE_KEY}`
+                    }
+                }
+            );
+
+            if (!maxResponse.ok) {
+                throw new Error('Erro ao buscar máximo código');
+            }
+
+            const maxData = await maxResponse.json();
+            const proximoCodigo = (maxData[0]?.codigo || 0) + 1;
+            pedidoData.codigo = proximoCodigo;
+            console.log(`🆕 Gerado novo código: ${proximoCodigo}`);
+        }
+
+        console.log('📝 POST /api/pedidos - Criando pedido:', pedidoData.codigo);
 
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos_faturamento`,
@@ -186,7 +189,7 @@ app.post('/api/pedidos', verificarAutenticacao, async (req, res) => {
                     'Content-Type': 'application/json',
                     Prefer: 'return=representation'
                 },
-                body: JSON.stringify(req.body)
+                body: JSON.stringify(pedidoData)
             }
         );
 
