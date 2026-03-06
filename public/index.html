@@ -173,9 +173,7 @@
                                     <span style="font-size: 1.1rem;">✓</span>
                                 </th>
                                 <th>Nº Pedido</th>
-                                <th>Nº NF</th> <!-- Nova coluna NF -->
                                 <th>Razão Social</th>
-                                <!-- Coluna CNPJ removida da visualização -->
                                 <th>Data Emissão</th>
                                 <th>Valor Total</th>
                                 <th>Status</th>
@@ -211,11 +209,7 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="codigo">Código</label>
-                            <input type="text" id="codigo" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="nf">Nº NF</label>
-                            <input type="number" id="nf" step="1" min="1">
+                            <input type="text" id="codigo" readonly placeholder="Aguardando...">
                         </div>
                         <div class="form-group">
                             <label for="documento">Documento</label>
@@ -335,10 +329,6 @@
                             <label for="setor">Setor</label>
                             <input type="text" id="setor">
                         </div>
-                        <div class="form-group">
-                            <label for="previsaoEntrega">Previsão de Entrega</label>
-                            <input type="date" id="previsaoEntrega">
-                        </div>
                     </div>
                 </div>
 
@@ -363,6 +353,10 @@
                                 <option value="Isaque">ISAQUE</option>
                                 <option value="Miguel">MIGUEL</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="previsaoEntrega">Previsão de Entrega</label>
+                            <input type="date" id="previsaoEntrega">
                         </div>
                     </div>
                 </div>
