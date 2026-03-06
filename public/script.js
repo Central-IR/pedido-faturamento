@@ -789,7 +789,7 @@ function updateTable() {
 }
 
 // ============================================
-// MODAL DE FORMULÁRIO
+// MODAL DE FORMULÁRIO (MODIFICADO: código editável)
 // ============================================
 async function openFormModal() {
     editingId = null;
@@ -797,21 +797,8 @@ async function openFormModal() {
     document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
     resetForm();
 
-    // Buscar o próximo código disponível
-    try {
-        const response = await fetch(`${API_URL}/proximo-codigo`, {
-            headers: { 'X-Session-Token': sessionToken }
-        });
-        if (response.ok) {
-            const { proximoCodigo } = await response.json();
-            document.getElementById('codigo').value = proximoCodigo;
-        } else {
-            document.getElementById('codigo').value = 'ERRO';
-        }
-    } catch (error) {
-        console.error('Erro ao buscar próximo código:', error);
-        document.getElementById('codigo').value = 'ERRO';
-    }
+    // Não busca código automaticamente, deixa em branco
+    document.getElementById('codigo').value = '';
 
     document.getElementById('dataRegistro').value = getDataAtual();
 
@@ -1078,6 +1065,12 @@ async function savePedido() {
     }
     
     const codigo = document.getElementById('codigo').value.trim();
+    if (!codigo) {
+        showMessage('Por favor, informe o número do pedido!', 'error');
+        activateTab(0);
+        return;
+    }
+
     const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
     const razaoSocial = document.getElementById('razaoSocial').value.trim();
     const endereco = document.getElementById('endereco').value.trim();
