@@ -204,10 +204,9 @@ function inicializarApp() {
         if (e.key === 'Enter') {
             const formModal = document.getElementById('formModal');
             if (formModal && formModal.classList.contains('show')) {
-                // Não salvar se o foco estiver em um textarea (para permitir quebra de linha)
                 const activeElement = document.activeElement;
                 if (activeElement && activeElement.tagName !== 'TEXTAREA') {
-                    e.preventDefault(); // evita qualquer comportamento padrão indesejado
+                    e.preventDefault();
                     savePedido();
                 }
             }
@@ -789,7 +788,7 @@ function updateTable() {
 }
 
 // ============================================
-// MODAL DE FORMULÁRIO (MODIFICADO: código editável)
+// MODAL DE FORMULÁRIO (MODIFICADO: código vazio)
 // ============================================
 async function openFormModal() {
     editingId = null;
@@ -797,7 +796,7 @@ async function openFormModal() {
     document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
     resetForm();
 
-    // Não busca código automaticamente, deixa em branco
+    // Código fica vazio (será gerado no backend)
     document.getElementById('codigo').value = '';
 
     document.getElementById('dataRegistro').value = getDataAtual();
@@ -1054,19 +1053,12 @@ function getItems() {
 }
 
 // ============================================
-// SALVAR PEDIDO
+// SALVAR PEDIDO (MODIFICADO: não envia código em novo pedido)
 // ============================================
 async function savePedido() {
     const responsavel = document.getElementById('responsavel').value.trim();
     if (!responsavel && !editingId) {
         showMessage('Por favor, selecione um responsável!', 'error');
-        activateTab(0);
-        return;
-    }
-    
-    const codigo = document.getElementById('codigo').value.trim();
-    if (!codigo) {
-        showMessage('Por favor, informe o número do pedido!', 'error');
         activateTab(0);
         return;
     }
@@ -1082,8 +1074,9 @@ async function savePedido() {
         return;
     }
     
+    // Monta o objeto do pedido
     const pedido = {
-        codigo,
+        // Não inclui codigo para novos pedidos
         cnpj,
         razao_social: razaoSocial,
         inscricao_estadual: document.getElementById('inscricaoEstadual').value.trim(),
@@ -1108,19 +1101,17 @@ async function savePedido() {
         vendedor
     };
     
-    if (items.length > 0 || !editingId) {
+    if (items.length > 0) {
         pedido.items = items;
     }
     
     if (!editingId) {
         pedido.responsavel = responsavel;
         pedido.status = 'pendente';
-    }
-    
-    if (!editingId) {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        pedido.data_registro = hoje.toISOString();
+        pedido.data_registro = new Date().toISOString();
+    } else {
+        // Em edição, inclui o código
+        pedido.codigo = document.getElementById('codigo').value.trim();
     }
     
     try {
@@ -1146,10 +1137,11 @@ async function savePedido() {
         await loadPedidos();
         closeFormModal(true);
         
+        const codigoExibido = wasEditing ? pedido.codigo : 'novo';
         if (wasEditing) {
-            showMessage(`Pedido ${codigo} atualizado`, 'success');
+            showMessage(`Pedido ${pedido.codigo} atualizado`, 'success');
         } else {
-            showMessage(`Pedido ${codigo} registrado`, 'success');
+            showMessage('Pedido registrado com sucesso!', 'success');
         }
     } catch (error) {
         console.error('Erro ao salvar:', error);
