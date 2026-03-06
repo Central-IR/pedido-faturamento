@@ -78,12 +78,33 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==============================
-// ROTA PARA ÚLTIMA NF
+// ROTA PARA PRÓXIMO CÓDIGO (usando sequence)
 // ==============================
-app.get('/api/ultima-nf', verificarAutenticacao, async (req, res) => {
+app.get('/api/proximo-codigo', verificarAutenticacao, async (req, res) => {
     try {
-        const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=nf&order=nf.desc.nullslast&limit=1`,
+        // Tenta usar a função RPC next_codigo (se criada)
+        const rpcResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/rpc/next_codigo`,
+            {
+                method: 'POST',
+                headers: {
+                    apikey: SUPABASE_KEY,
+                    Authorization: `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            }
+        );
+
+        if (rpcResponse.ok) {
+            const data = await rpcResponse.json();
+            return res.json({ proximoCodigo: data });
+        }
+
+        // Fallback: consulta manual
+        console.log('⚠️ Função next_codigo não disponível, usando fallback');
+        const maxResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos_faturamento?select=codigo&order=codigo.desc&limit=1`,
             {
                 headers: {
                     apikey: SUPABASE_KEY,
@@ -92,16 +113,16 @@ app.get('/api/ultima-nf', verificarAutenticacao, async (req, res) => {
             }
         );
 
-        if (!response.ok) {
-            throw new Error('Erro ao buscar última NF');
+        if (!maxResponse.ok) {
+            throw new Error('Erro ao buscar máximo código');
         }
 
-        const data = await response.json();
-        const ultimaNF = data[0]?.nf || 0;
-        res.json({ ultimaNF });
+        const maxData = await maxResponse.json();
+        const proximoCodigo = (maxData[0]?.codigo || 0) + 1;
+        res.json({ proximoCodigo });
     } catch (error) {
-        console.error('Erro ao obter última NF:', error);
-        res.status(500).json({ error: 'Erro ao buscar última NF' });
+        console.error('Erro ao obter próximo código:', error);
+        res.status(500).json({ error: 'Erro ao obter próximo código' });
     }
 });
 
@@ -314,5 +335,5 @@ app.listen(PORT, () => {
     console.log('📦 Supabase conectado com Service Role');
     console.log('💾 Tabela: pedidos_faturamento');
     console.log('📊 Estoque: Atualização por código');
-    console.log('✨ Novas colunas: responsavel, data_registro, nf');
+    console.log('✨ Novas colunas: responsavel, data_registro');
 });
