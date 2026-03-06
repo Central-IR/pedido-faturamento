@@ -549,6 +549,7 @@ td {
 tbody tr {
     background: var(--bg-card);
     transition: background 0.2s ease;
+    cursor: pointer;
 }
 
 tbody tr:nth-child(even) {
@@ -771,6 +772,7 @@ button.small {
     max-width: 200px;
 }
 
+/* AVISO REMOVIDO, mas mantido por segurança */
 .stock-warning {
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid #EF4444;
@@ -1271,13 +1273,4 @@ button.small {
 /* NF Modal - input spacing away from close button */
 #nfModal .modal-delete {
     padding-top: 3.5rem;
-}
-
-/* Linha clicável */
-tbody tr {
-    cursor: pointer;
-}
-
-tbody tr:hover {
-    background: var(--table-hover);
 }
