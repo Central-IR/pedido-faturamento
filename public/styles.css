@@ -1272,3 +1272,12 @@ button.small {
 #nfModal .modal-delete {
     padding-top: 3.5rem;
 }
+
+/* Linha clicável */
+tbody tr {
+    cursor: pointer;
+}
+
+tbody tr:hover {
+    background: var(--table-hover);
+}
