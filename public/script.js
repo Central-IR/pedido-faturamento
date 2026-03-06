@@ -653,7 +653,7 @@ function updateTable() {
     
     if (filtered.length === 0) {
         if (currentFetchController) return;
-        container.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
+        container.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">Nenhum registro encontrado</td></tr>';
         return;
     }
     
@@ -690,10 +690,9 @@ function updateTable() {
                </td>`;
 
         return `
-        <tr class="${emitida ? 'row-fechada' : ''}">
+        <tr class="${emitida ? 'row-fechada' : ''}" data-id="${pedido.id}" style="cursor:pointer;">
             ${checkboxCell}
             <td><strong>${pedido.codigo}</strong></td>
-            <td>${pedido.nf || '-'}</td> <!-- Exibe NF -->
             <td>${pedido.razao_social}</td>
             <td>${dataEmissao}</td>
             <td><strong>${pedido.valor_total || 'R$ 0,00'}</strong></td>
@@ -704,13 +703,24 @@ function updateTable() {
             </td>
             <td>
                 <div class="actions">
-                    <button onclick="viewPedido('${pedido.id}')" class="action-btn" style="background: #ff521d;">Ver</button>
                     <button onclick="editPedido('${pedido.id}')" class="action-btn" style="background: #6B7280;">Editar</button>
                     <button onclick="gerarEtiqueta('${pedido.id}')" class="action-btn" style="background: #22C55E;">Etiqueta</button>
                 </div>
             </td>
         </tr>`;
     }).join('');
+
+    // Adiciona evento de clique nas linhas para abrir o modal de visualização
+    document.querySelectorAll('#pedidosContainer tr').forEach(tr => {
+        tr.addEventListener('click', function(e) {
+            // Se o clique foi em um botão ou checkbox, não abre o modal
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input')) {
+                return;
+            }
+            const id = this.dataset.id;
+            if (id) viewPedido(id);
+        });
+    });
 }
 
 // ============================================
@@ -722,24 +732,22 @@ async function openFormModal() {
     document.getElementById('formTitle').textContent = 'Novo Pedido de Faturamento';
     resetForm();
 
-    // Buscar o último número de NF
+    // Buscar o próximo código disponível
     try {
-        const response = await fetch(`${API_URL}/ultima-nf`, {
+        const response = await fetch(`${API_URL}/proximo-codigo`, {
             headers: { 'X-Session-Token': sessionToken }
         });
         if (response.ok) {
-            const { ultimaNF } = await response.json();
-            document.getElementById('nf').value = ultimaNF + 1;
+            const { proximoCodigo } = await response.json();
+            document.getElementById('codigo').value = proximoCodigo;
         } else {
-            document.getElementById('nf').value = 1;
+            // fallback (improvável)
+            document.getElementById('codigo').value = 'ERRO';
         }
     } catch (error) {
-        console.error('Erro ao buscar última NF:', error);
-        document.getElementById('nf').value = 1;
+        console.error('Erro ao buscar próximo código:', error);
+        document.getElementById('codigo').value = 'ERRO';
     }
-
-    const maxCodigo = pedidos.length > 0 ? Math.max(...pedidos.map(p => parseInt(p.codigo) || 0)) : 0;
-    document.getElementById('codigo').value = (maxCodigo + 1).toString();
 
     document.getElementById('dataRegistro').value = getDataAtual();
 
@@ -749,10 +757,6 @@ async function openFormModal() {
         responsavelSelect.value = responsavelAuto;
         responsavelSelect.disabled = true;
     }
-
-    // Controlar edição da NF conforme permissão
-    const nfInput = document.getElementById('nf');
-    nfInput.readOnly = !userCanToggleEmissao();
 
     activateTab(0);
     document.getElementById('formModal').classList.add('show');
@@ -777,7 +781,7 @@ function resetForm() {
     document.querySelectorAll('#formModal input:not([type="checkbox"]), #formModal textarea, #formModal select').forEach(input => {
         if (input.type === 'checkbox') {
             input.checked = false;
-        } else if (input.id !== 'codigo' && input.id !== 'dataRegistro' && input.id !== 'nf') {
+        } else if (input.id !== 'codigo' && input.id !== 'dataRegistro') {
             input.value = '';
         }
     });
@@ -1052,7 +1056,6 @@ async function savePedido() {
     }
     
     const codigo = document.getElementById('codigo').value.trim();
-    const nf = document.getElementById('nf').value ? parseInt(document.getElementById('nf').value) : null;
     const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
     const razaoSocial = document.getElementById('razaoSocial').value.trim();
     const endereco = document.getElementById('endereco').value.trim();
@@ -1066,7 +1069,6 @@ async function savePedido() {
     
     const pedido = {
         codigo,
-        nf,
         cnpj,
         razao_social: razaoSocial,
         inscricao_estadual: document.getElementById('inscricaoEstadual').value.trim(),
@@ -1153,7 +1155,6 @@ async function editPedido(id) {
     updateTransportadoraSelects();
     
     document.getElementById('codigo').value = pedido.codigo;
-    document.getElementById('nf').value = pedido.nf || '';
     document.getElementById('documento').value = pedido.documento || '';
     
     if (pedido.responsavel) {
@@ -1187,10 +1188,6 @@ async function editPedido(id) {
     if (vendedorSelect && pedido.vendedor) {
         vendedorSelect.value = pedido.vendedor;
     }
-    
-    // Aplicar permissão para editar NF
-    const nfInput = document.getElementById('nf');
-    nfInput.readOnly = !userCanToggleEmissao();
     
     document.getElementById('itemsContainer').innerHTML = '';
     itemCounter = 0;
@@ -1279,10 +1276,6 @@ function viewPedido(id) {
     document.getElementById('info-tab-geral').innerHTML = `
         <div class="info-section">
             <h4>Informações Gerais</h4>
-            <div class="info-row">
-                <span class="info-label">Nº NF:</span>
-                <span class="info-value">${pedido.nf || '-'}</span>
-            </div>
             <div class="info-row">
                 <span class="info-label">Responsável:</span>
                 <span class="info-value">${pedido.responsavel || pedido.vendedor || '-'}</span>
@@ -1405,10 +1398,6 @@ function viewPedido(id) {
                 <span class="info-label">Setor:</span>
                 <span class="info-value">${pedido.setor || '-'}</span>
             </div>
-            <div class="info-row">
-                <span class="info-label">Previsão de Entrega:</span>
-                <span class="info-value">${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}</span>
-            </div>
         </div>
     `;
     
@@ -1426,6 +1415,10 @@ function viewPedido(id) {
             <div class="info-row">
                 <span class="info-label">Vendedor:</span>
                 <span class="info-value">${pedido.vendedor || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Previsão de Entrega:</span>
+                <span class="info-value">${pedido.previsao_entrega ? new Date(pedido.previsao_entrega).toLocaleDateString('pt-BR') : '-'}</span>
             </div>
         </div>
     `;
@@ -1615,7 +1608,7 @@ async function executarEmissao(id) {
 }
 
 // ============================================
-// GERAR ETIQUETA AUTOMÁTICA
+// GERAR ETIQUETA AUTOMÁTICA (MANTIDA)
 // ============================================
 function gerarEtiqueta(id) {
     const pedido = pedidos.find(p => p.id === id);
@@ -1629,66 +1622,13 @@ function gerarEtiqueta(id) {
         return;
     }
 
-    showNFModal(id);
-}
-
-function showNFModal(pedidoId) {
-    const existing = document.getElementById('nfModal');
-    if (existing) existing.remove();
-
-    const modalHTML = `
-        <div class="modal-overlay" id="nfModal" style="display:flex;">
-            <div class="modal-content modal-delete" style="max-width:420px; min-height:260px;">
-                <button class="close-modal" onclick="closeNFModal()">✕</button>
-                <div style="margin-bottom:1.5rem; padding: 0 0.25rem; margin-top:1rem;">
-                    <input type="text"
-                           id="nfInput"
-                           placeholder="Número da NF"
-                           style="text-align:center; font-size:1.1rem; font-weight:600; letter-spacing:1px;"
-                           onkeydown="if(event.key==='Enter') confirmarGerarEtiqueta('${pedidoId}')">
-                </div>
-                <div class="modal-actions modal-actions-no-border">
-                    <button type="button" onclick="confirmarGerarEtiqueta('${pedidoId}')" style="background:#22C55E; min-width:140px;">Gerar Etiqueta</button>
-                    <button type="button" onclick="closeNFModal()" class="cancel-close" style="min-width:100px;">Cancelar</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    setTimeout(() => document.getElementById('nfInput')?.focus(), 100);
-}
-
-function closeNFModal() {
-    const modal = document.getElementById('nfModal');
-    if (modal) {
-        modal.style.animation = 'fadeOut 0.2s ease forwards';
-        setTimeout(() => modal.remove(), 200);
-    }
-}
-
-function confirmarGerarEtiqueta(pedidoId) {
-    const nf = document.getElementById('nfInput')?.value?.trim();
-    if (!nf) {
-        showMessage('Informe o número da NF!', 'error');
-        return;
-    }
-
-    closeNFModal();
-
-    const pedido = pedidos.find(p => p.id === pedidoId);
-    if (!pedido) return;
-
-    let municipio = '';
-    const enderecoPartes = pedido.endereco.split(',');
-    municipio = enderecoPartes.length > 1
-        ? enderecoPartes[enderecoPartes.length - 1].trim()
-        : pedido.endereco;
-
+    // Como o campo NF foi removido, vamos usar o código do pedido como referência
+    const numeroReferencia = pedido.codigo;
     imprimirEtiquetasAutomatico(
-        nf,
+        numeroReferencia,
         parseInt(pedido.quantidade),
         pedido.razao_social,
-        municipio,
+        '', // município pode ser extraído do endereço se desejado
         pedido.endereco,
         pedido.local_entrega || ''
     );
@@ -1708,7 +1648,7 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
                     </div>
                 </div>
                 <div class='nf-volume-container'>
-                    <div class='nf-volume'>NF: ${nf}</div>
+                    <div class='nf-volume'>Pedido: ${nf}</div>
                     <div class='volume'>VOLUME: ${i}/${totalVolumes}</div>
                 </div>
                 <hr>
@@ -1725,7 +1665,7 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
     printWindow.document.write(`
         <html>
         <head>
-            <title>Etiquetas NF ${nf}</title>
+            <title>Etiquetas Pedido ${nf}</title>
             <style>
                 @page {
                     size: 100mm 150mm;
@@ -1818,5 +1758,5 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
     `);
     printWindow.document.close();
     
-    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para NF ${nf}`, 'success');
+    showMessage(`${totalVolumes} etiqueta(s) gerada(s) para o Pedido ${nf}`, 'success');
 }
