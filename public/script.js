@@ -1711,7 +1711,6 @@ function imprimirEtiquetasAutomatico(nf, totalVolumes, destinatario, municipio, 
                 <hr>
                 <div class='section-title'>DESTINATÁRIO:</div>
                 <div class='section'>${destinatario}</div>
-                <div class='section'>${municipio}</div>
                 <div class='section'>${endereco}</div>
                 ${infoAdicional ? `<div class='section-title additional-info'>LOCAL DE ENTREGA:</div><div class='section'>${infoAdicional}</div>` : ""}
             </div>
