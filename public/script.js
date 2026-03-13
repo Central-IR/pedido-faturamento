@@ -93,9 +93,27 @@ function showMessage(message, type = 'success') {
     }, 2000);
 }
 
+function getDataLocalISO() {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+}
+
 function formatarData(data) {
     if (!data) return '';
+    
+    // Se for string no formato YYYY-MM-DD, extrai os componentes diretamente
+    if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
+        const [ano, mes, dia] = data.split('-');
+        return `${dia}/${mes}/${ano}`;
+    }
+    
+    // Caso contrário, tenta converter via Date (para strings ISO com hora)
     const d = new Date(data);
+    if (isNaN(d.getTime())) return '';
+    
     const dia = String(d.getDate()).padStart(2, '0');
     const mes = String(d.getMonth() + 1).padStart(2, '0');
     const ano = d.getFullYear();
@@ -1108,7 +1126,7 @@ async function savePedido() {
     if (!editingId) {
         pedido.responsavel = responsavel;
         pedido.status = 'pendente';
-        pedido.data_registro = new Date().toISOString();
+        pedido.data_registro = getDataLocalISO(); // Salva apenas a data local
     } else {
         // Em edição, inclui o código
         pedido.codigo = document.getElementById('codigo').value.trim();
